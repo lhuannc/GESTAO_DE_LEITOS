@@ -71,8 +71,17 @@ async function loadDatabase(initSqlJs: any): Promise<Database> {
     }
   });
 
-  // Tenta carregar banco existente do localStorage
-  const savedDb = localStorage.getItem('higibed_sqlite_db');
+  // Tenta carregar banco existente do localStorage (compatibilidade com versão antiga)
+  let savedDb = localStorage.getItem('gestao_leitos_sqlite_db');
+  if (!savedDb) {
+    // Migração: tenta carregar do nome antigo e migra para o novo
+    const oldDb = localStorage.getItem('higibed_sqlite_db');
+    if (oldDb) {
+      savedDb = oldDb;
+      localStorage.setItem('gestao_leitos_sqlite_db', oldDb);
+      localStorage.removeItem('higibed_sqlite_db');
+    }
+  }
   
   if (savedDb) {
     try {
@@ -109,7 +118,7 @@ export function saveDatabase(db: Database) {
   // Converter Uint8Array para base64 sem usar Buffer
   const binary = String.fromCharCode(...data);
   const base64 = btoa(binary);
-  localStorage.setItem('higibed_sqlite_db', base64);
+  localStorage.setItem('gestao_leitos_sqlite_db', base64);
 }
 
 // Migração: adiciona colunas CPF se não existirem

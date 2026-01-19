@@ -52,7 +52,17 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('higibed_session');
+    // Tenta carregar sessão do localStorage (compatibilidade com versão antiga)
+    let savedUser = localStorage.getItem('gestao_leitos_session');
+    if (!savedUser) {
+      // Migração: tenta carregar do nome antigo e migra para o novo
+      const oldUser = localStorage.getItem('higibed_session');
+      if (oldUser) {
+        savedUser = oldUser;
+        localStorage.setItem('gestao_leitos_session', oldUser);
+        localStorage.removeItem('higibed_session');
+      }
+    }
     if (savedUser) {
       setCurrentUser(JSON.parse(savedUser));
     }
@@ -72,12 +82,12 @@ const App: React.FC = () => {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    localStorage.setItem('higibed_session', JSON.stringify(user));
+    localStorage.setItem('gestao_leitos_session', JSON.stringify(user));
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('higibed_session');
+    localStorage.removeItem('gestao_leitos_session');
     setActiveView('DASHBOARD');
   };
 
@@ -116,7 +126,7 @@ const App: React.FC = () => {
     <div className="flex h-screen overflow-hidden bg-slate-100">
       <aside className={`bg-slate-900 text-white transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'} flex flex-col z-20 shadow-xl`}>
         <div className="p-6 flex items-center justify-between border-b border-slate-800 shrink-0">
-          <h1 className={`font-bold text-xl text-sky-400 truncate transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>HigiBed</h1>
+          <h1 className={`font-bold text-xl text-sky-400 truncate transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>Gestão de Leitos</h1>
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Menu size={20} /></button>
         </div>
 

@@ -1,6 +1,6 @@
 {
-  "name": "HigiBed - Gestão de Leitos",
-  "short_name": "HigiBed",
+  "name": "Gestão de Leitos",
+  "short_name": "Gestão Leitos",
   "description": "Sistema de gestão e higienização de leitos hospitalares",
   "start_url": "/",
   "display": "standalone",

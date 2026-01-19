@@ -47,8 +47,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             <div className="inline-flex items-center justify-center w-20 h-20 bg-sky-500/10 rounded-3xl mb-6 border border-sky-500/20 text-sky-500 shadow-inner">
               <Hospital size={40} />
             </div>
-            <h1 className="text-3xl font-black text-white tracking-tight mb-2">HigiBed</h1>
-            <p className="text-slate-400 font-medium text-sm">Portal de Gestão Hospitalar</p>
+            <h1 className="text-3xl font-black text-white tracking-tight mb-2">Gestão de Leitos</h1>
+            <p className="text-slate-400 font-medium text-sm">Sistema de Gestão Hospitalar</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
