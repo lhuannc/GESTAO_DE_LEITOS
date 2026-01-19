@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: higibed-app
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    networks:
+      - higibed-network
+
+  # Serviço opcional para desenvolvimento
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: higibed-app-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development
+    networks:
+      - higibed-network
+    profiles:
+      - dev
+
+networks:
+  higibed-network:
+    driver: bridge

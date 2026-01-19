@@ -1,0 +1,28 @@
+{
+  "name": "higibed---gestão-e-higienização-de-leitos",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "ngrok:setup": "node setup-ngrok.js",
+    "ngrok:start": "node start-ngrok.js",
+    "dev:ngrok": "concurrently \"npm run dev\" \"npm run ngrok:start\""
+  },
+  "dependencies": {
+    "react": "^19.2.3",
+    "lucide-react": "^0.562.0",
+    "react-dom": "^19.2.3",
+    "recharts": "^3.6.0",
+    "sql.js": "^1.10.3",
+    "@zxing/library": "^0.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}

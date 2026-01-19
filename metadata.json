@@ -1,0 +1,5 @@
+{
+  "name": "HigiBed - Gestão e Higienização de Leitos",
+  "description": "Sistema completo para gerenciamento de leitos hospitalares, solicitações de serviços e fluxo de trabalho de higienização via Kanban.",
+  "requestFramePermissions": []
+}
