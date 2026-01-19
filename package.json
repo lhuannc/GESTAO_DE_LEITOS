@@ -5,8 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:all": "concurrently \"npm run dev:server\" \"npm run dev\"",
     "build": "vite build",
     "preview": "vite preview",
+    "server": "tsx server/index.ts",
     "ngrok:setup": "node setup-ngrok.js",
     "ngrok:start": "node start-ngrok.js",
     "dev:ngrok": "concurrently \"npm run dev\" \"npm run ngrok:start\""
@@ -16,13 +19,20 @@
     "lucide-react": "^0.562.0",
     "react-dom": "^19.2.3",
     "recharts": "^3.6.0",
-    "sql.js": "^1.10.3",
-    "@zxing/library": "^0.20.0"
+    "@zxing/library": "^0.20.0",
+    "better-sqlite3": "^11.7.0",
+    "express": "^4.21.1",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/better-sqlite3": "^7.6.12",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "vite": "^6.2.0",
+    "tsx": "^4.19.2",
+    "concurrently": "^9.1.0"
   }
 }

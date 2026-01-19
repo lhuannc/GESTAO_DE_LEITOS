@@ -12,78 +12,95 @@ Sistema completo para gerenciamento e controle de leitos hospitalares, solicita�
 
 ## 🚀 Tecnologias Utilizadas
 
+### Frontend
 - **React 19** - Biblioteca JavaScript para construção de interfaces
 - **TypeScript** - Superset do JavaScript com tipagem estática
 - **Vite** - Build tool moderna e rápida
-- **SQLite (sql.js)** - Banco de dados SQLite rodando no navegador
 - **Tailwind CSS** - Framework CSS utilitário
 - **Lucide React** - Biblioteca de ícones
 - **Recharts** - Biblioteca de gráficos
 - **Zxing Library** - Biblioteca para leitura de códigos QR
+
+### Backend
+- **Node.js** - Ambiente de execução JavaScript
+- **Express** - Framework web para Node.js
+- **Better-SQLite3** - Driver SQLite nativo e rápido
+- **TypeScript** - Tipagem estática no backend
+- **CORS** - Middleware para requisições cross-origin
 
 ## 📁 Estrutura do Projeto
 
 ```
 GESTAO_DE_LEITOS/
 │
-├── components/              # Componentes React da aplicação
-│   ├── Dashboard.tsx       # Painel principal com métricas e gráficos
-│   ├── Login.tsx           # Tela de autenticação
-│   ├── QRCodeScanner.tsx   # Componente para leitura de QR Codes
+├── server/                    # Backend Node.js
+│   ├── index.ts              # API REST Express
+│   ├── database.ts           # Lógica de banco de dados SQLite
+│   └── tsconfig.json         # Configuração TypeScript do servidor
+│
+├── components/               # Componentes React da aplicação
+│   ├── Dashboard.tsx        # Painel principal com métricas e gráficos
+│   ├── Login.tsx            # Tela de autenticação
+│   ├── QRCodeScanner.tsx    # Componente para leitura de QR Codes
 │   ├── RegistrationManager.tsx  # Gerenciador de cadastros (Admin)
 │   ├── ServiceOrdersKanban.tsx  # Board Kanban de ordens de serviço
 │   └── ServiceRequestForm.tsx   # Formulário de solicitação de serviços
 │
-├── public/                 # Arquivos estáticos
+├── public/                  # Arquivos estáticos
 │   ├── manifest.json       # Manifesto PWA
 │   └── README_ICONS.md     # Documentação de ícones
 │
-├── App.tsx                 # Componente raiz da aplicação
-├── backend.ts              # Camada de lógica de negócio e acesso ao banco
-├── database.ts             # Operações de banco de dados SQLite
-├── types.ts                # Definições de tipos TypeScript
-├── constants.ts            # Constantes e dados iniciais
-├── utils.ts                # Funções utilitárias
-├── index.tsx               # Ponto de entrada da aplicação
-├── index.html              # HTML principal
-├── vite.config.ts          # Configuração do Vite
-├── tsconfig.json           # Configuração do TypeScript
+├── data/                    # Banco de dados SQLite (gerado automaticamente)
+│   └── gestao_leitos.db    # Arquivo SQLite real no disco
 │
-├── Dockerfile              # Imagem Docker para produção
-├── Dockerfile.dev          # Imagem Docker para desenvolvimento
-├── docker-compose.yml      # Orquestração de containers Docker
-├── nginx.conf              # Configuração do servidor web Nginx
+├── App.tsx                  # Componente raiz da aplicação
+├── backend.ts               # Cliente HTTP para API do backend
+├── types.ts                 # Definições de tipos TypeScript
+├── constants.ts             # Constantes e dados iniciais
+├── utils.ts                 # Funções utilitárias
+├── index.tsx                # Ponto de entrada da aplicação
+├── index.html               # HTML principal
+├── vite.config.ts           # Configuração do Vite
+├── tsconfig.json            # Configuração do TypeScript
 │
-├── setup-ngrok.js          # Script de configuração do Ngrok
-├── start-ngrok.js          # Script de inicialização do Ngrok
+├── Dockerfile               # Imagem Docker para produção
+├── Dockerfile.dev           # Imagem Docker para desenvolvimento
+├── docker-compose.yml       # Orquestração de containers Docker
+├── nginx.conf               # Configuração do servidor web Nginx
 │
-├── DOCKER_SETUP.md         # Documentação de setup Docker
-├── HTTP_CAMERA_SETUP.md    # Guia de configuração de câmera HTTP
-└── NGROK_SETUP.md          # Documentação de setup Ngrok
+├── setup-ngrok.js           # Script de configuração do Ngrok
+├── start-ngrok.js           # Script de inicialização do Ngrok
+│
+├── DOCKER_SETUP.md          # Documentação de setup Docker
+├── HTTP_CAMERA_SETUP.md     # Guia de configuração de câmera HTTP
+└── NGROK_SETUP.md           # Documentação de setup Ngrok
 ```
 
 ## 🏗️ Arquitetura
 
 ### Camadas da Aplicação
 
-1. **Camada de Apresentação (Components)**
+1. **Camada de Apresentação (Frontend)**
    - Componentes React reutilizáveis
    - Interface de usuário responsiva
    - Gerenciamento de estado local com React Hooks
+   - Comunicação com backend via HTTP REST
 
-2. **Camada de Lógica (Backend)**
-   - `backend.ts`: Lógica de negócio e orquestração
-   - `database.ts`: Operações de banco de dados SQLite
-   - Validações e transformações de dados
+2. **Camada de API (Backend Node.js)**
+   - API RESTful com Express
+   - Endpoints para todas as operações CRUD
+   - Autenticação de usuários
+   - Gerenciamento de ordens de serviço
 
-3. **Camada de Dados**
-   - SQLite no navegador (via sql.js)
-   - Persistência no localStorage
-   - Backup automático de dados
+3. **Camada de Dados (SQLite)**
+   - Banco de dados SQLite real no disco
+   - Arquivo local: `data/gestao_leitos.db`
+   - Persistência permanente de dados
+   - Transações ACID
 
 ## 💾 Banco de Dados
 
-O projeto utiliza **SQLite** rodando no navegador através da biblioteca `sql.js`. O banco de dados é inicializado automaticamente na primeira execução e os dados são salvos no `localStorage` do navegador em formato base64.
+O projeto utiliza **SQLite real** no disco local através do `better-sqlite3`. O banco de dados é criado automaticamente na primeira execução do backend no diretório `data/`.
 
 ### Tabelas do Banco de Dados
 
@@ -100,11 +117,13 @@ O projeto utiliza **SQLite** rodando no navegador através da biblioteca `sql.js
 
 ### Funcionalidades do Banco
 
-- ✅ Inicialização automática na primeira execução
+- ✅ Banco SQLite real no disco local
+- ✅ Criação automática na primeira execução
 - ✅ Migração automática de dados iniciais
-- ✅ Persistência no localStorage do navegador
-- ✅ Operações CRUD completas
-- ✅ Backup automático a cada operação de escrita
+- ✅ Persistência permanente
+- ✅ Transações ACID
+- ✅ Foreign keys habilitadas
+- ✅ Modo WAL para melhor performance
 
 ## 👥 Sistema de Usuários e Permissões
 
@@ -169,22 +188,57 @@ O sistema possui três níveis de permissão:
    npm install
    ```
 
-3. **Execute o projeto em modo de desenvolvimento**
+3. **Inicie o backend**
+   ```bash
+   npm run server
+   ```
+   O servidor backend iniciará em `http://localhost:3001` e criará o banco de dados em `data/gestao_leitos.db`.
+
+4. **Em outro terminal, inicie o frontend**
    ```bash
    npm run dev
    ```
 
-4. **Acesse a aplicação**
-   - Abra o navegador em `http://localhost:5173`
+5. **Ou inicie ambos simultaneamente**
+   ```bash
+   npm run dev:all
+   ```
+
+6. **Acesse a aplicação**
+   - Frontend: `http://localhost:5173` (ou porta configurada no Vite)
+   - Backend API: `http://localhost:3001`
 
 ## 📦 Scripts Disponíveis
 
-- `npm run dev` - Inicia o servidor de desenvolvimento
+### Frontend
+- `npm run dev` - Inicia o servidor de desenvolvimento do frontend
 - `npm run build` - Cria build de produção
 - `npm run preview` - Visualiza o build de produção
+
+### Backend
+- `npm run server` - Inicia o servidor backend Node.js
+- `npm run dev:server` - Inicia o servidor em modo watch (reinicia automaticamente)
+
+### Ambos
+- `npm run dev:all` - Inicia backend e frontend simultaneamente
+
+### Utilitários
 - `npm run ngrok:setup` - Configura o Ngrok
 - `npm run ngrok:start` - Inicia o Ngrok
 - `npm run dev:ngrok` - Executa desenvolvimento com Ngrok
+
+## 🔌 API REST
+
+O backend expõe a seguinte API REST:
+
+- `GET /api/data` - Buscar todos os dados
+- `POST /api/auth` - Autenticação de usuário
+- `POST /api/orders` - Criar ordens de serviço
+- `POST /api/orders/:id/assign` - Atribuir ordem a usuário
+- `POST /api/orders/:id/unassign` - Remover atribuição
+- `PUT /api/orders/:id/status` - Atualizar status da ordem
+- `POST /api/registry` - Salvar registro (CRUD)
+- `DELETE /api/registry/:type/:id` - Deletar registro
 
 ## 🐳 Docker
 
@@ -194,7 +248,6 @@ O projeto inclui configuração Docker completa para desenvolvimento e produçã
 
 A aplicação é configurada como PWA, permitindo:
 - Instalação em dispositivos móveis
-- Funcionamento offline (com dados em localStorage)
 - Acesso à câmera para leitura de QR Codes
 
 ## 🔐 Autenticação
@@ -202,7 +255,15 @@ A aplicação é configurada como PWA, permitindo:
 O sistema utiliza autenticação baseada em usuários locais. Os dados de sessão são armazenados no `localStorage` do navegador.
 
 **Usuário padrão (para testes):**
-- Login: Consultar dados iniciais em `constants.ts`
+- Login: `ADMIN`
+- Senha: `ADMIN`
+
+## 📝 Notas Importantes
+
+- O banco de dados SQLite é criado automaticamente na pasta `data/` na primeira execução do backend
+- O arquivo `data/gestao_leitos.db` é ignorado pelo Git (não será versionado)
+- Para backup, copie manualmente o arquivo `data/gestao_leitos.db`
+- O backend precisa estar rodando para o frontend funcionar completamente
 
 ## 📚 Documentação Adicional
 

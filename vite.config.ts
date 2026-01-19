@@ -19,10 +19,6 @@ export default defineConfig(({ mode }) => {
           '@': path.resolve(__dirname, '.'),
         }
       },
-      optimizeDeps: {
-        exclude: ['sql.js']
-      },
-      assetsInclude: ['**/*.wasm'],
       worker: {
         format: 'es'
       },

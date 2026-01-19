@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Banco de dados SQLite
+data/
+*.db
+*.db-shm
+*.db-wal
