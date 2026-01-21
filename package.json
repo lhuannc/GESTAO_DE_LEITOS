@@ -4,24 +4,35 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm run server\" \"npm run dev:client\"",
+    "dev:client": "vite",
+    "server": "node server.js",
     "build": "vite build",
     "preview": "vite preview",
+    "migrate": "node migrate-data.js",
     "ngrok:setup": "node setup-ngrok.js",
     "ngrok:start": "node start-ngrok.js",
     "dev:ngrok": "concurrently \"npm run dev\" \"npm run ngrok:start\""
   },
   "dependencies": {
-    "react": "^19.2.3",
+    "@zxing/library": "^0.20.0",
+    "better-sqlite3": "^11.9.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "face-api.js": "^0.22.2",
     "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "recharts": "^3.6.0",
-    "sql.js": "^1.10.3",
-    "@zxing/library": "^0.20.0"
+    "sql.js": "^1.10.3"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.1.2",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

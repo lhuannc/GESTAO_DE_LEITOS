@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { db } from '../backend';
 import QRCodeScanner from './QRCodeScanner';
+import FaceAuthScanner from './FaceAuthScanner';
 
 interface ServiceOrdersKanbanProps {
   orders: ServiceOrder[];
@@ -78,6 +79,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   const [confirmedItemIds, setConfirmedItemIds] = useState<string[]>([]);
   const [now, setNow] = useState(Date.now());
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showFaceScanner, setShowFaceScanner] = useState(false);
   const [qrScanAttempts, setQrScanAttempts] = useState(0);
   const [showLoginFallback, setShowLoginFallback] = useState(false);
   const [loginCredentials, setLoginCredentials] = useState({ login: '', password: '' });
@@ -120,6 +122,42 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
     setConfirmationType('ASSIGN');
     setQrScanAttempts(0);
     setShowLoginFallback(false);
+    
+    // Verifica se o usuário atual tem biometria cadastrada
+    // Se tiver, oferece opção de usar reconhecimento facial
+    // Caso contrário, usa QR code padrão
+    const hasFaceDescriptor = currentUser.faceDescriptor && currentUser.faceDescriptor.length > 0;
+    
+    if (hasFaceDescriptor) {
+      // Tenta usar reconhecimento facial primeiro
+      setShowFaceScanner(true);
+    } else {
+      // Usa QR code se não tiver biometria
+      setShowQRScanner(true);
+    }
+  };
+
+  const handleFaceMatch = async (userId: string) => {
+    if (!editingOrder) return;
+    
+    // Verifica se o match corresponde ao usuário atual
+    if (userId === currentUser.id) {
+      // Match válido - prosseguir com atribuição
+      setShowFaceScanner(false);
+      await performAssign();
+    } else {
+      // Match inválido - mostra erro e permite tentar novamente
+      alert('Rosto não corresponde ao usuário atual. Tente novamente.');
+      setShowFaceScanner(false);
+      // Fallback para QR code após falha facial
+      setShowQRScanner(true);
+    }
+  };
+
+  const handleFaceScannerError = (error: string) => {
+    console.error('Erro no scanner facial:', error);
+    // Fallback para QR code em caso de erro
+    setShowFaceScanner(false);
     setShowQRScanner(true);
   };
 
@@ -179,6 +217,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
         setEditingOrder(null);
         setIsConfirmingItems(false);
         setShowQRScanner(false);
+        setShowFaceScanner(false);
         setShowLoginFallback(false);
         setQrScanAttempts(0);
       }
@@ -544,6 +583,19 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showFaceScanner && (
+        <FaceAuthScanner
+          users={users}
+          onMatch={handleFaceMatch}
+          onClose={() => {
+            setShowFaceScanner(false);
+            // Fallback para QR code se fechar o scanner facial
+            setShowQRScanner(true);
+          }}
+          onError={handleFaceScannerError}
+        />
       )}
 
       {showQRScanner && (

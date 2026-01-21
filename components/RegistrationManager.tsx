@@ -9,6 +9,7 @@ import {
   UserCheck, Mail, ShieldCheck, Fingerprint, CreditCard
 } from 'lucide-react';
 import { maskCPF, unmaskCPF, md5 } from '../utils';
+import FaceRegistration from './FaceRegistration';
 
 type TabId = 'empresa' | 'unidade' | 'setor' | 'leito' | 'servico' | 'usuario' | 'equipe' | 'insumo';
 
@@ -44,6 +45,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<any>({});
   const [isEditing, setIsEditing] = useState(false);
+  const [showFaceRegistration, setShowFaceRegistration] = useState(false);
 
   const tabsConfig = useMemo(() => [
     { id: 'empresa' as TabId, label: 'Empresas', icon: <Building2 size={18} />, module: 'company' },
@@ -276,6 +278,34 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                     <Input label="Login de Acesso" value={formData.login} onChange={v => setFormData({...formData, login: v})} icon={<Fingerprint size={16}/>} required />
                     <Input label="Senha" type="password" value={formData.password} onChange={v => setFormData({...formData, password: v})} icon={<ShieldCheck size={16}/>} required />
                   </div>
+                  
+                  <div className="pt-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <UserCheck size={14} className="text-sky-500" /> Biometria Facial
+                    </label>
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                      <div className="flex-1">
+                        <p className="text-xs font-bold text-slate-700">
+                          {formData.faceDescriptor && formData.faceDescriptor.length > 0 
+                            ? 'Biometria cadastrada' 
+                            : 'Biometria não cadastrada'}
+                        </p>
+                        {formData.faceDescriptor && formData.faceDescriptor.length > 0 && (
+                          <p className="text-[9px] text-slate-400 mt-1">
+                            Descritor com {formData.faceDescriptor.length} valores
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowFaceRegistration(true)}
+                        className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold text-xs transition-colors flex items-center gap-2"
+                      >
+                        <UserCheck size={14} />
+                        {formData.faceDescriptor && formData.faceDescriptor.length > 0 ? 'Re-cadastrar' : 'Cadastrar'}
+                      </button>
+                    </div>
+                  </div>
                 </>
               )}
 
@@ -409,6 +439,17 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {showFaceRegistration && (
+        <FaceRegistration
+          onSave={(descriptor) => {
+            setFormData({...formData, faceDescriptor: descriptor});
+            setShowFaceRegistration(false);
+          }}
+          onClose={() => setShowFaceRegistration(false)}
+          currentUserName={formData.name || 'Usuário'}
+        />
       )}
     </div>
   );

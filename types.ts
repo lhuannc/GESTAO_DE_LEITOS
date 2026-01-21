@@ -80,6 +80,7 @@ export interface User {
   password?: string; // Novo: senha do usuário
   cpf?: string; // CPF do usuário
   cpfHash?: string; // Hash MD5 do CPF
+  faceDescriptor?: number[]; // Descritor facial do face-api.js (Float32Array convertido para Array)
   companyId: string;
   permissions: UserPermissions;
 }

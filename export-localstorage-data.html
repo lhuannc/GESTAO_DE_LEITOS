@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Exportar Dados do LocalStorage</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 Exportar Dados do LocalStorage</h1>
+        <div class="info">
+            <p><strong>Como usar:</strong></p>
+            <ol>
+                <li>Abra esta página no mesmo navegador onde você usa a aplicação</li>
+                <li>Clique no botão abaixo para exportar os dados</li>
+                <li>O arquivo <code>data-export.json</code> será baixado automaticamente</li>
+                <li>Salve o arquivo na raiz do projeto (mesmo diretório do <code>package.json</code>)</li>
+                <li>Execute <code>npm run migrate</code> para importar os dados no SQLite</li>
+            </ol>
+        </div>
+        <button onclick="exportData()">📥 Exportar Dados</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        async function exportData() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<p>🔄 Processando...</p>';
+
+            try {
+                // Verificar se há dados no localStorage
+                const dbBase64 = localStorage.getItem('gestao_leitos_sqlite_db') || 
+                                 localStorage.getItem('higibed_sqlite_db');
+
+                if (!dbBase64) {
+                    resultDiv.innerHTML = '<p style="color: orange;">⚠️ Nenhum dado encontrado no localStorage.</p>';
+                    return;
+                }
+
+                // Carregar sql.js
+                if (typeof initSqlJs === 'undefined') {
+                    const script = document.createElement('script');
+                    script.src = 'https://sql.js.org/dist/sql-wasm.js';
+                    await new Promise((resolve, reject) => {
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                }
+
+                const SQL = await initSqlJs({
+                    locateFile: file => `https://sql.js.org/dist/${file}`
+                });
+
+                // Converter base64 para buffer
+                const binary = atob(dbBase64);
+                const buffer = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    buffer[i] = binary.charCodeAt(i);
+                }
+
+                // Abrir banco
+                const db = new SQL.Database(buffer);
+
+                // Exportar dados
+                const exportData = {};
+
+                const tables = [
+                    'companies', 'units', 'sectors', 'beds', 'services', 
+                    'actions', 'users', 'teams', 'complement_items', 'service_orders'
+                ];
+
+                for (const table of tables) {
+                    try {
+                        const result = db.exec(`SELECT * FROM ${table}`);
+                        if (result.length > 0) {
+                            // Obter nomes das colunas
+                            const colInfo = db.exec(`PRAGMA table_info(${table})`)[0].values;
+                            const columns = colInfo.map(col => col[1]);
+
+                            // Converter resultados
+                            exportData[table] = result[0].values.map(row => {
+                                const obj = {};
+                                columns.forEach((col, idx) => {
+                                    obj[col] = row[idx];
+                                });
+                                return obj;
+                            });
+                        } else {
+                            exportData[table] = [];
+                        }
+                    } catch (error) {
+                        console.warn(`Erro ao exportar tabela ${table}:`, error);
+                        exportData[table] = [];
+                    }
+                }
+
+                // Criar e baixar arquivo JSON
+                const json = JSON.stringify(exportData, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'data-export.json';
+                a.click();
+                URL.revokeObjectURL(url);
+
+                // Mostrar resumo
+                let summary = '<h3>✅ Exportação concluída!</h3><ul>';
+                for (const [table, data] of Object.entries(exportData)) {
+                    summary += `<li><strong>${table}:</strong> ${data.length} registros</li>`;
+                }
+                summary += '</ul>';
+                summary += '<p><strong>📁 Arquivo baixado:</strong> data-export.json</p>';
+                summary += '<p><strong>💡 Próximo passo:</strong> Execute <code>npm run migrate</code> na raiz do projeto.</p>';
+
+                resultDiv.innerHTML = summary;
+
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">❌ Erro: ${error.message}</p><pre>${error.stack}</pre>`;
+                console.error('Erro ao exportar:', error);
+            }
+        }
+    </script>
+</body>
+</html>
