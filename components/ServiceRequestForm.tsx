@@ -107,8 +107,8 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
   const availableBeds = beds.filter(b => b.status !== 'HIGIENIZACAO');
 
   return (
-    <div className="max-w-4xl mx-auto py-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+    <div className="max-w-4xl mx-auto py-4 md:py-6 lg:py-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 mb-6 md:mb-8">
         <div className="flex items-center space-x-3">
           <div className="p-3 bg-sky-100 text-sky-600 rounded-lg">
             <ClipboardCheck size={24} />
@@ -129,8 +129,8 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="lg:col-span-2 space-y-4 md:space-y-6">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">Leito</label>
             <select 
@@ -209,12 +209,12 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                           {isMissing && <AlertCircle size={16} className="text-rose-400" />}
                        </div>
 
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
                          {allowedItems.length > 0 ? (
                            allowedItems.map(item => {
                               const qty = selectedItemsPerStep[idx]?.[item.id] || 0;
                               return (
-                                <div key={item.id} className={`p-4 rounded-xl border transition-all flex items-center justify-between ${qty > 0 ? 'bg-white border-sky-300 shadow-md' : 'bg-white/50 border-slate-100 hover:border-slate-300'}`}>
+                                <div key={item.id} className={`p-3 md:p-4 rounded-lg md:rounded-xl border transition-all flex items-center justify-between ${qty > 0 ? 'bg-white border-sky-300 shadow-md' : 'bg-white/50 border-slate-100 hover:border-slate-300'}`}>
                                    <div className="flex-1 pr-2">
                                       <p className="text-[11px] font-black text-slate-700 uppercase leading-tight">{item.name}</p>
                                       {showCosts && <p className="text-[10px] text-emerald-600 font-bold mt-1">R$ {item.unitCost.toFixed(2)}</p>}
@@ -242,7 +242,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
 
         {/* Sidebar de Resumo */}
         <div className="lg:col-span-1">
-           <div className="bg-slate-900 text-white rounded-3xl p-8 sticky top-4 shadow-2xl">
+           <div className="bg-slate-900 text-white rounded-2xl md:rounded-3xl p-4 md:p-6 lg:p-8 sticky top-2 md:top-4 shadow-2xl">
               <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400 mb-8 border-b border-sky-900/50 pb-4">Checklist da Solicitação</h4>
               
               <div className="space-y-6 mb-10">

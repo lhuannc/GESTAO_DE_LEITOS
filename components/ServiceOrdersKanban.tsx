@@ -202,6 +202,13 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
     setIsConfirmingItems(true);
   };
 
+  const handleConfirmAssign = async () => {
+    if (!editingOrder) return;
+    setIsConfirmingItems(false);
+    setConfirmationType(null);
+    await performAssign();
+  };
+
   const handleConfirmComplete = async () => {
     if (!editingOrder) return;
     const updated = await db.updateOrderStatus(editingOrder.id, 'CONCLUIDO', currentUser.id, 'Etapa finalizada após conferência final de itens.');
@@ -242,19 +249,19 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
 
   return (
     <div className="relative">
-      <div className="flex space-x-4 overflow-x-auto pb-8 min-h-[600px] scrollbar-hide">
+      <div className="flex space-x-3 md:space-x-4 overflow-x-auto pb-4 md:pb-8 min-h-[500px] md:min-h-[600px] scrollbar-hide">
         {COLUMNS.map(col => (
-          <div key={col.id} className="min-w-[300px] w-[300px] flex-shrink-0">
-            <div className={`p-3 rounded-t-xl border-b-2 flex justify-between items-center ${col.color}`}>
+          <div key={col.id} className="min-w-[280px] md:min-w-[300px] w-[280px] md:w-[300px] flex-shrink-0">
+            <div className={`p-2 md:p-3 rounded-t-lg md:rounded-t-xl border-b-2 flex justify-between items-center ${col.color}`}>
               <div className="flex items-center space-x-2">
                 {col.icon}
-                <span className="font-bold text-xs uppercase tracking-widest">{col.label}</span>
+                <span className="font-bold text-[10px] md:text-xs uppercase tracking-widest">{col.label}</span>
               </div>
-              <span className="bg-white/50 text-[10px] px-2 py-0.5 rounded-full font-black">
+              <span className="bg-white/50 text-[9px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded-full font-black">
                 {visibleOrders.filter(o => o.status === col.id).length}
               </span>
             </div>
-            <div className="bg-slate-50/50 p-3 rounded-b-xl border-x border-b border-slate-200 space-y-4 min-h-[500px]">
+            <div className="bg-slate-50/50 p-2 md:p-3 rounded-b-lg md:rounded-b-xl border-x border-b border-slate-200 space-y-3 md:space-y-4 min-h-[400px] md:min-h-[500px]">
               {visibleOrders
                 .filter(o => o.status === col.id)
                 .map(order => (
@@ -280,10 +287,10 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
       </div>
 
       {editingOrder && (
-        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:flex-row h-[90vh] md:h-auto">
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-50 p-2 md:p-4">
+          <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl max-w-5xl w-full overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col lg:flex-row h-[95vh] md:h-[90vh] lg:h-auto">
             
-            <div className="bg-slate-900 md:w-80 text-white p-8 flex flex-col shrink-0 overflow-y-auto">
+            <div className="bg-slate-900 lg:w-80 text-white p-4 md:p-6 lg:p-8 flex flex-col shrink-0 overflow-y-auto">
               <div className="flex justify-between items-start mb-6">
                 <span className="bg-sky-500 text-[10px] font-black uppercase px-2 py-0.5 rounded flex items-center gap-1">
                   <Hash size={10} /> {editingOrder.id.slice(-6)}
@@ -343,8 +350,8 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
               </div>
             </div>
 
-            <div className="flex-1 p-8 bg-white flex flex-col overflow-hidden">
-              <div className="flex-1 overflow-y-auto pr-4 scrollbar-hide mb-6 space-y-8">
+            <div className="flex-1 p-4 md:p-6 lg:p-8 bg-white flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto pr-2 md:pr-4 scrollbar-hide mb-4 md:mb-6 space-y-6 md:space-y-8">
                 {isConfirmingItems ? (
                   <div className="animate-in slide-in-from-right-4 duration-300">
                     <div className="flex items-center gap-3 mb-6">
@@ -651,7 +658,7 @@ const KanbanCard: React.FC<{ order: ServiceOrder; bed: Bed | undefined; team: Te
   const itemsCost = (order.items || []).reduce((acc, it) => acc + (it.unitCost * it.quantity), 0);
 
   return (
-    <div onClick={onClick} className={`bg-white p-5 rounded-2xl border shadow-sm transition-all cursor-pointer group relative overflow-hidden flex flex-col min-h-[190px] h-[190px] ${order.status === 'BLOQUEADO' ? 'border-slate-100 grayscale-[0.5]' : 'border-slate-200 hover:shadow-xl hover:-translate-y-1'}`}>
+    <div onClick={onClick} className={`bg-white p-4 md:p-5 rounded-xl md:rounded-2xl border shadow-sm transition-all cursor-pointer group relative overflow-hidden flex flex-col min-h-[170px] md:min-h-[190px] h-[170px] md:h-[190px] ${order.status === 'BLOQUEADO' ? 'border-slate-100 grayscale-[0.5]' : 'border-slate-200 hover:shadow-xl hover:-translate-y-1'}`}>
       <div className="absolute top-2 left-2 flex items-center gap-1 bg-slate-50 text-slate-400 px-1.5 py-0.5 rounded text-[8px] font-black border border-slate-100">
         <Hash size={8} /> {order.id.slice(-6)}
       </div>

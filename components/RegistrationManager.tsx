@@ -162,14 +162,14 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-6">
-      <div className="w-full md:w-64 space-y-1">
+    <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+      <div className="w-full md:w-56 lg:w-64 space-y-1 flex-shrink-0">
         {tabsConfig.map(tab => (
           <button 
             key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`w-full flex items-center space-x-3 p-3 rounded-lg font-medium transition-all ${activeTab === tab.id ? 'bg-sky-50 text-sky-700 shadow-sm border border-sky-100' : 'text-slate-500 hover:bg-slate-50'}`}
+            className={`w-full flex items-center space-x-2 md:space-x-3 p-2.5 md:p-3 rounded-lg font-medium transition-all text-sm ${activeTab === tab.id ? 'bg-sky-50 text-sky-700 shadow-sm border border-sky-100' : 'text-slate-500 hover:bg-slate-50'}`}
           >
-            {tab.icon} <span>{tab.label}</span>
+            {tab.icon} <span className="text-xs md:text-sm">{tab.label}</span>
           </button>
         ))}
       </div>
@@ -248,14 +248,14 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden animate-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h4 className="font-black text-slate-800 uppercase tracking-tight">{isEditing ? 'Editar' : 'Novo'} {activeTab}</h4>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4">
+          <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden animate-in zoom-in duration-200 max-h-[95vh] md:max-h-[90vh] flex flex-col">
+            <div className="p-4 md:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+              <h4 className="font-black text-slate-800 uppercase tracking-tight text-sm md:text-base">{isEditing ? 'Editar' : 'Novo'} {activeTab}</h4>
               <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-400" /></button>
             </div>
             
-            <form onSubmit={handleFormSubmit} className="p-8 space-y-6 max-h-[80vh] overflow-y-auto scrollbar-hide">
+            <form onSubmit={handleFormSubmit} className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 flex-1 overflow-y-auto scrollbar-hide">
               <Input label={activeTab === 'usuario' ? 'Nome Completo' : 'Nome Identificador'} value={formData.name} onChange={v => setFormData({...formData, name: v})} required />
 
               {activeTab === 'usuario' && (
@@ -288,7 +288,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block flex items-center gap-2">
                     <UserCheck size={14} className="text-sky-500" /> Associar Membros da Equipe
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
                     {users.filter(u => u.companyId === formData.companyId).map(user => {
                       const isMember = (formData.userIds || []).includes(user.id);
                       return (
@@ -296,7 +296,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                           key={user.id}
                           type="button"
                           onClick={() => toggleUserInTeam(user.id)}
-                          className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-3 ${isMember ? 'bg-sky-50 border-sky-200 ring-2 ring-sky-100 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200'}`}
+                          className={`p-2.5 md:p-3 rounded-xl md:rounded-2xl border text-left transition-all flex items-center gap-2 md:gap-3 ${isMember ? 'bg-sky-50 border-sky-200 ring-2 ring-sky-100 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200'}`}
                         >
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${isMember ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
                             {user.name.charAt(0)}
@@ -400,10 +400,10 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                 </div>
               )}
 
-              <div className="pt-4 flex space-x-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 transition-colors uppercase text-xs">Cancelar</button>
-                <button type="submit" className="flex-1 py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-black transition-colors shadow-lg flex items-center justify-center space-x-2 uppercase text-xs">
-                  <Save size={18} /> <span>Salvar Registro</span>
+              <div className="pt-3 md:pt-4 flex space-x-2 md:space-x-3 shrink-0">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-3 md:py-4 bg-slate-100 text-slate-600 font-bold rounded-xl md:rounded-2xl hover:bg-slate-200 transition-colors uppercase text-xs">Cancelar</button>
+                <button type="submit" className="flex-1 py-3 md:py-4 bg-slate-900 text-white font-bold rounded-xl md:rounded-2xl hover:bg-black transition-colors shadow-lg flex items-center justify-center space-x-2 uppercase text-xs">
+                  <Save size={16} className="md:w-[18px] md:h-[18px]" /> <span>Salvar Registro</span>
                 </button>
               </div>
             </form>

@@ -124,9 +124,9 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100">
-      <aside className={`bg-slate-900 text-white transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'} flex flex-col z-20 shadow-xl`}>
-        <div className="p-6 flex items-center justify-between border-b border-slate-800 shrink-0">
-          <h1 className={`font-bold text-xl text-sky-400 truncate transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>Gestão de Leitos</h1>
+      <aside className={`bg-slate-900 text-white transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'} md:w-64 flex flex-col z-20 shadow-xl`}>
+        <div className="p-4 md:p-6 flex items-center justify-between border-b border-slate-800 shrink-0">
+          <h1 className={`font-bold text-lg md:text-xl text-sky-400 truncate transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>Gestão de Leitos</h1>
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Menu size={20} /></button>
         </div>
 
@@ -165,10 +165,10 @@ const App: React.FC = () => {
       </aside>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 relative">
-          {syncing && <div className="absolute top-4 right-8 z-30 flex items-center space-x-2 bg-white/80 px-3 py-1 rounded-full border border-sky-100 shadow-sm"><RefreshCw className="w-3 h-3 text-sky-500 animate-spin" /></div>}
+        <main className="flex-1 overflow-y-auto p-3 md:p-4 lg:p-8 bg-slate-50 relative">
+          {syncing && <div className="absolute top-3 md:top-4 right-4 md:right-8 z-30 flex items-center space-x-2 bg-white/80 px-3 py-1 rounded-full border border-sky-100 shadow-sm"><RefreshCw className="w-3 h-3 text-sky-500 animate-spin" /></div>}
           
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 min-h-full p-6">
+          <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-slate-200 min-h-full p-4 md:p-6">
             {activeView === 'DASHBOARD' && <Dashboard beds={beds} orders={serviceOrders} users={users} services={services} />}
             {activeView === 'SOLICITAR' && <ServiceRequestForm beds={beds} services={services} actions={actions} currentUser={currentUser} onSuccess={async () => { await loadAllData(); setActiveView('DASHBOARD'); }} />}
             {activeView === 'ORDENS' && canAccessKanban && <ServiceOrdersKanban orders={serviceOrders} services={services} actions={actions} beds={beds} currentUser={currentUser} teams={teams} users={users} onUpdateOrder={handleUpdateOrder} onCompleteOrder={() => loadAllData()} />}

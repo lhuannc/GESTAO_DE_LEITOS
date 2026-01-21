@@ -78,36 +78,36 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
       {/* Resumo de Métricas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         {osStats.map((stat) => (
-          <div key={stat.name} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.name.replace('_', ' ')}</p>
-              <h3 className="text-3xl font-black text-slate-800">{stat.value}</h3>
+          <div key={stat.name} className="bg-white border border-slate-200 rounded-xl md:rounded-2xl p-4 md:p-6 shadow-sm flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest truncate">{stat.name.replace('_', ' ')}</p>
+              <h3 className="text-2xl md:text-3xl font-black text-slate-800">{stat.value}</h3>
             </div>
-            <div className={`w-3 h-12 rounded-full ${COLORS[stat.name as keyof typeof COLORS]}`} />
+            <div className={`w-2 md:w-3 h-10 md:h-12 rounded-full shrink-0 ml-2 ${COLORS[stat.name as keyof typeof COLORS]}`} />
           </div>
         ))}
       </div>
 
       {/* Gráficos e Lista Detalhada */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        <div className="xl:col-span-1 space-y-8">
-          <div className="bg-white p-6 border border-slate-200 rounded-3xl shadow-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="lg:col-span-1 space-y-6 md:space-y-8">
+          <div className="bg-white p-4 md:p-6 border border-slate-200 rounded-2xl md:rounded-3xl shadow-sm">
             <h4 className="text-[10px] font-black text-slate-800 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
               <PieChart size={14} className="text-sky-500" /> Ocupação Geral
             </h4>
-            <div className="h-64">
+            <div className="h-48 md:h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={bedStats}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
+                    innerRadius={45}
+                    outerRadius={65}
                     paddingAngle={5}
                     dataKey="value"
                   >
@@ -124,8 +124,8 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
         </div>
 
         {/* Lista de Ordens Detalhada Requisitada */}
-        <div className="xl:col-span-2 bg-white p-8 border border-slate-200 rounded-3xl shadow-sm overflow-hidden flex flex-col">
-          <div className="flex justify-between items-center mb-8">
+        <div className="lg:col-span-2 bg-white p-4 md:p-6 lg:p-8 border border-slate-200 rounded-2xl md:rounded-3xl shadow-sm overflow-hidden flex flex-col">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 md:mb-8">
             <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
               <Layers size={14} className="text-sky-500" /> Últimas Solicitações de Fluxo
             </h4>
@@ -134,14 +134,14 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
             </span>
           </div>
 
-          <div className="overflow-x-auto -mx-8">
+          <div className="overflow-x-auto -mx-4 md:-mx-8">
             <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                  <th className="px-8 py-4"># Número</th>
-                  <th className="px-8 py-4">Leito</th>
-                  <th className="px-8 py-4">Serviço</th>
-                  <th className="px-8 py-4">Etapas do Fluxo</th>
+                <tr className="bg-slate-50 text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                  <th className="px-4 md:px-8 py-3 md:py-4"># Número</th>
+                  <th className="px-4 md:px-8 py-3 md:py-4">Leito</th>
+                  <th className="px-4 md:px-8 py-3 md:py-4">Serviço</th>
+                  <th className="px-4 md:px-8 py-3 md:py-4">Etapas do Fluxo</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -152,31 +152,31 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
                   
                   return (
                     <tr key={firstOrder.groupId} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-8 py-6">
-                        <span className="bg-slate-900 text-white text-[9px] font-black px-2 py-1 rounded shadow-sm group-hover:bg-sky-600 transition-colors">
+                      <td className="px-4 md:px-8 py-4 md:py-6">
+                        <span className="bg-slate-900 text-white text-[8px] md:text-[9px] font-black px-2 py-1 rounded shadow-sm group-hover:bg-sky-600 transition-colors">
                           {firstOrder.groupId.slice(-6).toUpperCase()}
                         </span>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-4 md:px-8 py-4 md:py-6">
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${BED_STATUS_COLORS[bed?.status || 'DISPONIVEL']}`} />
-                          <span className="text-xs font-black text-slate-700 uppercase">{bed?.name || 'N/A'}</span>
+                          <span className="text-[10px] md:text-xs font-black text-slate-700 uppercase">{bed?.name || 'N/A'}</span>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-4 md:px-8 py-4 md:py-6">
                         <div className="flex flex-col">
-                          <span className="text-xs font-bold text-slate-800">{service?.name || 'Fluxo Manual'}</span>
-                          <span className="text-[9px] text-slate-400 font-medium flex items-center gap-1 mt-1">
-                            <Clock size={10} /> {new Date(firstOrder.requestedAt).toLocaleDateString()} às {new Date(firstOrder.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          <span className="text-[10px] md:text-xs font-bold text-slate-800">{service?.name || 'Fluxo Manual'}</span>
+                          <span className="text-[8px] md:text-[9px] text-slate-400 font-medium flex items-center gap-1 mt-1">
+                            <Clock size={9} className="md:w-[10px] md:h-[10px]" /> {new Date(firstOrder.requestedAt).toLocaleDateString()} às {new Date(firstOrder.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-1">
+                      <td className="px-4 md:px-8 py-4 md:py-6">
+                        <div className="flex items-center gap-1 flex-wrap">
                           {group.map((order, idx) => (
                             <div key={order.id} className="flex items-center">
                               <div 
-                                className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-black uppercase transition-all ${
+                                className={`flex items-center gap-1 px-1.5 md:gap-1.5 md:px-2 py-1 rounded-md border text-[8px] md:text-[9px] font-black uppercase transition-all ${
                                   order.status === 'CONCLUIDO' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
                                   order.status === 'EM_ANDAMENTO' ? 'bg-sky-50 border-sky-100 text-sky-600 ring-2 ring-sky-50' :
                                   order.status === 'PENDENTE' ? 'bg-amber-50 border-amber-100 text-amber-600' :
@@ -185,7 +185,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
                                 title={`${order.subServiceName}: ${order.status}`}
                               >
                                 {getStatusIcon(order.status)}
-                                <span className="max-w-[80px] truncate">{order.subServiceName || `Etapa ${idx + 1}`}</span>
+                                <span className="max-w-[60px] md:max-w-[80px] truncate">{order.subServiceName || `Etapa ${idx + 1}`}</span>
                               </div>
                               {idx < group.length - 1 && (
                                 <div className="w-2 h-0.5 bg-slate-100 mx-0.5 shrink-0" />
@@ -199,10 +199,10 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
                 })}
                 {orderGroups.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-8 py-20 text-center">
+                    <td colSpan={4} className="px-4 md:px-8 py-12 md:py-20 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3 opacity-30">
-                        <Layers size={40} />
-                        <p className="text-[10px] font-black uppercase tracking-widest">Nenhuma ordem solicitada recentemente</p>
+                        <Layers size={32} className="md:w-10 md:h-10" />
+                        <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest">Nenhuma ordem solicitada recentemente</p>
                       </div>
                     </td>
                   </tr>
@@ -212,8 +212,8 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
           </div>
           
           {orderGroups.length > 0 && (
-            <div className="mt-auto pt-6 border-t border-slate-50 text-center">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="mt-auto pt-4 md:pt-6 border-t border-slate-50 text-center">
+              <p className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                 Exibindo as {Math.min(10, orderGroups.length)} solicitações mais recentes
               </p>
             </div>
