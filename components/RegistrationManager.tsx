@@ -125,6 +125,25 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       allowedItemIds: item.allowedItemIds || [] // Para etapas
     };
     
+    // Se for leito, calcular companyId a partir do setor
+    if (activeTab === 'leito' && item.sectorId) {
+      const sector = sectors.find(s => s.id === item.sectorId);
+      if (sector) {
+        const unit = units.find(u => u.id === sector.unitId);
+        if (unit) {
+          formDataToSet.companyId = unit.companyId;
+        }
+      }
+    }
+    
+    // Se for setor, calcular companyId a partir da unidade
+    if (activeTab === 'setor' && item.unitId) {
+      const unit = units.find(u => u.id === item.unitId);
+      if (unit) {
+        formDataToSet.companyId = unit.companyId;
+      }
+    }
+    
     // Se for usuário e tiver CPF, aplicar máscara
     if (activeTab === 'usuario' && item.cpf) {
       formDataToSet.cpf = maskCPF(item.cpf);
@@ -328,7 +347,10 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                     required
                   >
                     <option value="">Selecione uma unidade...</option>
-                    {units.filter(u => u.companyId === formData.companyId).map(u => (
+                    {units.filter(u => {
+                      const companyId = formData.companyId || currentUser.companyId;
+                      return u.companyId === companyId;
+                    }).map(u => (
                       <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
                   </select>
@@ -348,7 +370,10 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                       required
                     >
                       <option value="">Selecione um setor...</option>
-                      {sectors.filter(s => units.some(u => u.id === s.unitId && u.companyId === formData.companyId)).map(s => (
+                      {sectors.filter(s => {
+                        const companyId = formData.companyId || currentUser.companyId;
+                        return units.some(u => u.id === s.unitId && u.companyId === companyId);
+                      }).map(s => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
