@@ -602,9 +602,14 @@ class BackendDB {
       } else if (type === 'units') {
         db.run('UPDATE units SET name = ?, companyId = ? WHERE id = ?', [newItem.name, newItem.companyId, id]);
       } else if (type === 'sectors') {
-        db.run('UPDATE sectors SET name = ?, unitId = ? WHERE id = ?', [newItem.name, newItem.unitId, id]);
+        const name = newItem.name ?? null;
+        const unitId = newItem.unitId ?? null;
+        db.run('UPDATE sectors SET name = ?, unitId = ? WHERE id = ?', [name, unitId, id]);
       } else if (type === 'beds') {
-        db.run('UPDATE beds SET name = ?, sectorId = ?, status = ? WHERE id = ?', [newItem.name, newItem.sectorId, newItem.status, id]);
+        const name = newItem.name ?? null;
+        const sectorId = newItem.sectorId ?? null;
+        const status = newItem.status ?? 'DISPONIVEL';
+        db.run('UPDATE beds SET name = ?, sectorId = ?, status = ? WHERE id = ?', [name, sectorId, status, id]);
       } else if (type === 'services') {
         const config = newItem.config ? JSON.stringify(newItem.config) : null;
         db.run('UPDATE services SET name = ?, companyId = ?, config = ? WHERE id = ?', [newItem.name, newItem.companyId, config, id]);
@@ -642,9 +647,14 @@ class BackendDB {
       } else if (type === 'units') {
         db.run('INSERT INTO units (id, name, companyId) VALUES (?, ?, ?)', [id, newItem.name, newItem.companyId]);
       } else if (type === 'sectors') {
-        db.run('INSERT INTO sectors (id, name, unitId) VALUES (?, ?, ?)', [id, newItem.name, newItem.unitId]);
+        const name = newItem.name ?? null;
+        const unitId = newItem.unitId ?? null;
+        db.run('INSERT INTO sectors (id, name, unitId) VALUES (?, ?, ?)', [id, name, unitId]);
       } else if (type === 'beds') {
-        db.run('INSERT INTO beds (id, name, sectorId, status) VALUES (?, ?, ?, ?)', [id, newItem.name, newItem.sectorId, newItem.status]);
+        const name = newItem.name ?? null;
+        const sectorId = newItem.sectorId ?? null;
+        const status = newItem.status ?? 'DISPONIVEL';
+        db.run('INSERT INTO beds (id, name, sectorId, status) VALUES (?, ?, ?, ?)', [id, name, sectorId, status]);
       } else if (type === 'services') {
         const config = newItem.config ? JSON.stringify(newItem.config) : null;
         db.run('INSERT INTO services (id, name, companyId, config) VALUES (?, ?, ?, ?)', [id, newItem.name, newItem.companyId, config]);

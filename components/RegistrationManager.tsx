@@ -105,6 +105,11 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       baseData.permissions = { pages: ['dashboard', 'ordens'], modules: ['bed'], isAdmin: false };
     } else if (activeTab === 'servico') {
       baseData.config = { generateMultipleOS: false, subOrders: [] };
+    } else if (activeTab === 'setor') {
+      baseData.unitId = '';
+    } else if (activeTab === 'leito') {
+      baseData.sectorId = '';
+      baseData.status = 'DISPONIVEL';
     }
     
     setFormData(baseData);
@@ -154,6 +159,18 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       // Validar campos obrigatórios para etapas
       if (!formData.targetTeamId || formData.targetTeamId.trim() === '') {
         alert('Por favor, selecione uma equipe responsável para a etapa.');
+        return;
+      }
+    }
+    if (activeTab === 'setor') {
+      if (!formData.unitId || formData.unitId.trim() === '') {
+        alert('Por favor, selecione uma unidade para o setor.');
+        return;
+      }
+    }
+    if (activeTab === 'leito') {
+      if (!formData.sectorId || formData.sectorId.trim() === '') {
+        alert('Por favor, selecione um setor para o leito.');
         return;
       }
     }
@@ -298,6 +315,62 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
             
             <form onSubmit={handleFormSubmit} className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 flex-1 overflow-y-auto scrollbar-hide">
               <Input label={activeTab === 'usuario' ? 'Nome Completo' : 'Nome Identificador'} value={formData.name} onChange={v => setFormData({...formData, name: v})} required />
+
+              {activeTab === 'setor' && (
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <Hospital size={14} className="text-sky-500" /> Unidade
+                  </label>
+                  <select
+                    value={formData.unitId || ''}
+                    onChange={(e) => setFormData({ ...formData, unitId: e.target.value })}
+                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none text-sm font-bold text-slate-700"
+                    required
+                  >
+                    <option value="">Selecione uma unidade...</option>
+                    {units.filter(u => u.companyId === formData.companyId).map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {activeTab === 'leito' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <Layers size={14} className="text-sky-500" /> Setor
+                    </label>
+                    <select
+                      value={formData.sectorId || ''}
+                      onChange={(e) => setFormData({ ...formData, sectorId: e.target.value })}
+                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none text-sm font-bold text-slate-700"
+                      required
+                    >
+                      <option value="">Selecione um setor...</option>
+                      {sectors.filter(s => units.some(u => u.id === s.unitId && u.companyId === formData.companyId)).map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <BedIcon size={14} className="text-sky-500" /> Status
+                    </label>
+                    <select
+                      value={formData.status || 'DISPONIVEL'}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none text-sm font-bold text-slate-700"
+                    >
+                      <option value="DISPONIVEL">Disponível</option>
+                      <option value="OCUPADO">Ocupado</option>
+                      <option value="HIGIENIZACAO">Higienização</option>
+                      <option value="MANUTENCAO">Manutenção</option>
+                      <option value="AGUARDANDO_ALTA">Aguardando Alta</option>
+                    </select>
+                  </div>
+                </>
+              )}
 
               {activeTab === 'usuario' && (
                 <>
