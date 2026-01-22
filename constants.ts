@@ -1,5 +1,5 @@
 
-import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, BedStatus, Team, ComplementItem } from './types';
+import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, BedStatus, Team, ComplementItem, Step } from './types';
 
 export const INITIAL_COMPANY: Company = {
   id: 'c1',
@@ -98,6 +98,23 @@ export const INITIAL_SERVICES: ServiceType[] = [
 ];
 
 export const INITIAL_ACTIONS: ActionStatus[] = [];
+
+export const INITIAL_STEPS: Step[] = [
+  {
+    id: 'stp-1',
+    name: 'Limpeza Técnica',
+    companyId: 'c1',
+    targetTeamId: 'tm-1', // Equipe de Higiene Terminal
+    allowedItemIds: ['it-1', 'it-2'] // Kit Higiene Padrão e Premium
+  },
+  {
+    id: 'stp-2',
+    name: 'Troca de Enxoval',
+    companyId: 'c1',
+    targetTeamId: 'tm-2', // Equipe de Rouparia/Enxoval
+    allowedItemIds: ['it-3', 'it-4'] // Kit Enxoval Solteiro e Casal/Especial
+  }
+];
 
 export const BED_STATUS_COLORS: Record<BedStatus, string> = {
   DISPONIVEL: 'bg-emerald-500',

@@ -8,7 +8,8 @@ import {
   INITIAL_SERVICES, 
   INITIAL_ACTIONS,
   INITIAL_TEAMS,
-  INITIAL_COMPLEMENT_ITEMS
+  INITIAL_COMPLEMENT_ITEMS,
+  INITIAL_STEPS
 } from './constants';
 
 // Tipo para Database do sql.js
@@ -121,7 +122,7 @@ export function saveDatabase(db: Database) {
   localStorage.setItem('gestao_leitos_sqlite_db', base64);
 }
 
-// Migração: adiciona colunas CPF se não existirem
+// Migração: adiciona colunas CPF se não existirem e cria tabela steps se não existir
 function migrateDatabase(db: Database): void {
   let needsMigration = false;
   
@@ -145,6 +146,58 @@ function migrateDatabase(db: Database): void {
     if (error && !error.message?.includes('duplicate column')) {
       console.log('Erro ao adicionar coluna cpfHash:', error);
     }
+  }
+  
+  // Criar tabela steps se não existir
+  try {
+    db.run(`
+      CREATE TABLE IF NOT EXISTS steps (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        companyId TEXT NOT NULL,
+        targetTeamId TEXT NOT NULL,
+        allowedItemIds TEXT NOT NULL,
+        FOREIGN KEY (companyId) REFERENCES companies(id),
+        FOREIGN KEY (targetTeamId) REFERENCES teams(id)
+      )
+    `);
+    
+    // Adicionar coluna slaMinutes se não existir
+    try {
+      db.run('ALTER TABLE steps ADD COLUMN slaMinutes INTEGER');
+      needsMigration = true;
+    } catch (error: any) {
+      if (error && !error.message?.includes('duplicate column')) {
+        console.log('Erro ao adicionar coluna slaMinutes:', error);
+      }
+    }
+    
+    // Verificar se a tabela está vazia e fazer seed se necessário
+    const checkStmt = db.prepare('SELECT COUNT(*) as count FROM steps');
+    checkStmt.step();
+    const result = checkStmt.getAsObject() as { count: number };
+    checkStmt.free();
+    
+    if (result.count === 0) {
+      // Inserir etapas padrão
+      INITIAL_STEPS.forEach(step => {
+        const allowedItemIds = JSON.stringify(step.allowedItemIds);
+        try {
+          db.run(
+            `INSERT INTO steps (id, name, companyId, targetTeamId, allowedItemIds, slaMinutes) VALUES (?, ?, ?, ?, ?, ?)`,
+            [step.id, step.name, step.companyId, step.targetTeamId, allowedItemIds, step.slaMinutes || null]
+          );
+        } catch (error: any) {
+          // Ignorar erro se já existir
+          if (!error.message?.includes('UNIQUE constraint')) {
+            console.log('Erro ao inserir etapa padrão:', error);
+          }
+        }
+      });
+      needsMigration = true;
+    }
+  } catch (error: any) {
+    console.log('Erro ao criar/migrar tabela steps:', error);
   }
   
   // Se a migração foi executada, atualizar admin e salvar
@@ -279,6 +332,20 @@ function createTables(db: Database): void {
     )
   `);
 
+  // Tabela de etapas (steps)
+  db.run(`
+    CREATE TABLE IF NOT EXISTS steps (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      companyId TEXT NOT NULL,
+      targetTeamId TEXT NOT NULL,
+      allowedItemIds TEXT NOT NULL,
+      slaMinutes INTEGER,
+      FOREIGN KEY (companyId) REFERENCES companies(id),
+      FOREIGN KEY (targetTeamId) REFERENCES teams(id)
+    )
+  `);
+
   // Tabela de ordens de serviço
   db.run(`
     CREATE TABLE IF NOT EXISTS service_orders (
@@ -394,6 +461,15 @@ function seedInitialData(db: Database) {
     );
   });
 
+  // Inserir etapas
+  INITIAL_STEPS.forEach(step => {
+    const allowedItemIds = JSON.stringify(step.allowedItemIds);
+    db.run(
+      `INSERT INTO steps (id, name, companyId, targetTeamId, allowedItemIds, slaMinutes) VALUES (?, ?, ?, ?, ?, ?)`,
+      [step.id, step.name, step.companyId, step.targetTeamId, allowedItemIds, step.slaMinutes || null]
+    );
+  });
+
   saveDatabase(db);
 }
 
@@ -479,6 +555,17 @@ export function rowToComplementItem(row: any[]): ComplementItem {
     name: row[1] as string,
     unitCost: row[2] as number,
     companyId: row[3] as string
+  };
+}
+
+export function rowToStep(row: any[]): any {
+  return {
+    id: row[0] as string,
+    name: row[1] as string,
+    companyId: row[2] as string,
+    targetTeamId: row[3] as string,
+    allowedItemIds: JSON.parse(row[4] as string),
+    slaMinutes: row[5] ? (row[5] as number) : undefined
   };
 }
 

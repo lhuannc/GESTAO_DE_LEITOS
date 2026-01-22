@@ -24,7 +24,8 @@ import {
   rowToUser,
   rowToTeam,
   rowToComplementItem,
-  rowToServiceOrder
+  rowToServiceOrder,
+  rowToStep
 } from './database';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -73,6 +74,9 @@ class BackendDB {
     const complementItemsResult = db.exec('SELECT * FROM complement_items');
     const complementItems = complementItemsResult.length > 0 ? complementItemsResult[0].values.map(r => rowToComplementItem(r)) : [];
     
+    const stepsResult = db.exec('SELECT * FROM steps');
+    const steps = stepsResult.length > 0 ? stepsResult[0].values.map(r => rowToStep(r)) : [];
+    
     const ordersResult = db.exec('SELECT * FROM service_orders');
     const orders = ordersResult.length > 0 ? ordersResult[0].values.map(r => rowToServiceOrder(r)) : [];
 
@@ -86,6 +90,7 @@ class BackendDB {
       users,
       teams,
       complementItems,
+      steps,
       orders
     };
   }
@@ -127,7 +132,8 @@ class BackendDB {
     serviceId: string, 
     userId: string, 
     companyId: string,
-    stepsItems?: Record<number, { itemId: string, quantity: number }[]> 
+    stepsItems?: Record<number, { itemId: string, quantity: number }[]>,
+    activeSteps?: number[] // Etapas que devem ser incluídas no pedido
   }) {
     await delay(300);
     await this.ensureInitialized();
@@ -170,9 +176,46 @@ class BackendDB {
     };
 
     if (service.config?.generateMultipleOS && service.config.subOrders?.length) {
-      service.config.subOrders.forEach((sub, index) => {
-        const initialStatus: OSStatus = index === 0 ? 'PENDENTE' : 'BLOQUEADO';
-        const orderId = `so-${Date.now()}-${index}`;
+      // Filtrar apenas etapas ativas (se especificado)
+      const activeStepsSet = requestData.activeSteps ? new Set(requestData.activeSteps) : null;
+      const stepsToCreate = service.config.subOrders
+        .map((sub, index) => ({ sub, index }))
+        .filter(({ index }) => !activeStepsSet || activeStepsSet.has(index));
+
+      // Reindexar steps para manter sequência correta
+      const stepIndexMap = new Map<number, number>();
+      stepsToCreate.forEach(({ index }, newIdx) => {
+        stepIndexMap.set(index, newIdx);
+      });
+
+      stepsToCreate.forEach(({ sub, index: originalIndex }) => {
+        const newIndex = stepIndexMap.get(originalIndex)!;
+        // Primeira etapa ativa deve ser PENDENTE, demais BLOQUEADO
+        const isFirstActive = newIndex === 0;
+        const initialStatus: OSStatus = isFirstActive ? 'PENDENTE' : 'BLOQUEADO';
+        const orderId = `so-${Date.now()}-${newIndex}`;
+        
+        // Buscar dados da etapa se stepId estiver presente
+        let stepName = sub.name || '';
+        let stepTeamId = sub.targetTeamId || '';
+        let stepItemIds = sub.allowedItemIds || [];
+        
+        if (sub.stepId) {
+          const stepStmt = db.prepare('SELECT * FROM steps WHERE id = ?');
+          stepStmt.bind([sub.stepId]);
+          const stepRows: any[] = [];
+          while (stepStmt.step()) {
+            stepRows.push(stepStmt.getAsObject());
+          }
+          stepStmt.free();
+          
+          if (stepRows.length > 0) {
+            const stepRow = stepRows[0];
+            stepName = stepRow.name;
+            stepTeamId = stepRow.targetTeamId;
+            stepItemIds = JSON.parse(stepRow.allowedItemIds);
+          }
+        }
         
         const order: ServiceOrder = {
           id: orderId,
@@ -180,20 +223,20 @@ class BackendDB {
           bedId: requestData.bedId,
           serviceId: requestData.serviceId,
           requesterUserId: requestData.userId,
-          subServiceName: sub.name,
-          step: index,
+          subServiceName: stepName,
+          step: newIndex, // Usar novo índice sequencial
           currentActionId: '',
           responsibleUserId: null,
-          assignedTeamId: sub.targetTeamId,
+          assignedTeamId: stepTeamId,
           companyId: requestData.companyId,
           requestedAt: new Date().toISOString(),
           status: initialStatus,
-          items: processItems(index),
+          items: processItems(originalIndex), // Usar índice original para buscar itens
           history: [{
             status: initialStatus,
             userId: requestData.userId,
             timestamp: new Date().toISOString(),
-            note: index === 0 ? 'Fluxo iniciado.' : 'Aguardando dependência.'
+            note: isFirstActive ? 'Fluxo iniciado.' : 'Aguardando dependência.'
           }]
         };
 
@@ -536,6 +579,7 @@ class BackendDB {
       users: 'users',
       teams: 'teams',
       complementItems: 'complement_items',
+      steps: 'steps',
       orders: 'service_orders'
     };
 
@@ -575,6 +619,21 @@ class BackendDB {
         db.run('UPDATE teams SET name = ?, companyId = ?, userIds = ? WHERE id = ?', [newItem.name, newItem.companyId, userIds, id]);
       } else if (type === 'complementItems') {
         db.run('UPDATE complement_items SET name = ?, unitCost = ?, companyId = ? WHERE id = ?', [newItem.name, newItem.unitCost, newItem.companyId, id]);
+      } else if (type === 'steps') {
+        // Validar campos obrigatórios
+        if (!newItem.name || !newItem.companyId || !newItem.targetTeamId) {
+          throw new Error('Campos obrigatórios não preenchidos: nome, empresa ou equipe responsável.');
+        }
+        const allowedItemIds = JSON.stringify(newItem.allowedItemIds || []);
+        try {
+          db.run('UPDATE steps SET name = ?, companyId = ?, targetTeamId = ?, allowedItemIds = ?, slaMinutes = ? WHERE id = ?', 
+            [newItem.name, newItem.companyId, newItem.targetTeamId, allowedItemIds, newItem.slaMinutes || null, id]);
+        } catch (error: any) {
+          if (error.message?.includes('FOREIGN KEY')) {
+            throw new Error('Equipe ou empresa selecionada não existe no banco de dados.');
+          }
+          throw error;
+        }
       }
     } else {
       // Inserir
@@ -600,6 +659,21 @@ class BackendDB {
         db.run('INSERT INTO teams (id, name, companyId, userIds) VALUES (?, ?, ?, ?)', [id, newItem.name, newItem.companyId, userIds]);
       } else if (type === 'complementItems') {
         db.run('INSERT INTO complement_items (id, name, unitCost, companyId) VALUES (?, ?, ?, ?)', [id, newItem.name, newItem.unitCost, newItem.companyId]);
+      } else if (type === 'steps') {
+        // Validar campos obrigatórios
+        if (!newItem.name || !newItem.companyId || !newItem.targetTeamId) {
+          throw new Error('Campos obrigatórios não preenchidos: nome, empresa ou equipe responsável.');
+        }
+        const allowedItemIds = JSON.stringify(newItem.allowedItemIds || []);
+        try {
+          db.run('INSERT INTO steps (id, name, companyId, targetTeamId, allowedItemIds, slaMinutes) VALUES (?, ?, ?, ?, ?, ?)', 
+            [id, newItem.name, newItem.companyId, newItem.targetTeamId, allowedItemIds, newItem.slaMinutes || null]);
+        } catch (error: any) {
+          if (error.message?.includes('FOREIGN KEY')) {
+            throw new Error('Equipe ou empresa selecionada não existe no banco de dados.');
+          }
+          throw error;
+        }
       }
     }
 
@@ -622,6 +696,7 @@ class BackendDB {
       users: 'users',
       teams: 'teams',
       complementItems: 'complement_items',
+      steps: 'steps',
       orders: 'service_orders'
     };
 

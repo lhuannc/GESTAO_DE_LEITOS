@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { Bed, ServiceType, ActionStatus, User, ServiceOrder, ComplementItem } from '../types';
+import { Bed, ServiceType, ActionStatus, User, ServiceOrder, ComplementItem, Step } from '../types';
 import { ClipboardCheck, ArrowRight, Layers, Package, Plus, Minus, DollarSign, AlertCircle, Eye, EyeOff, User as UserIcon } from 'lucide-react';
 import { db } from '../backend';
 
@@ -9,13 +9,15 @@ interface ServiceRequestFormProps {
   services: ServiceType[];
   actions: ActionStatus[];
   currentUser: User;
+  steps?: Step[];
   onSuccess: () => void;
 }
 
 const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({ 
   beds, 
   services, 
-  currentUser, 
+  currentUser,
+  steps = [],
   onSuccess 
 }) => {
   const [selectedBedId, setSelectedBedId] = useState('');
@@ -26,6 +28,9 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
 
   // Estrutura: { stepIndex: { itemId: quantity } }
   const [selectedItemsPerStep, setSelectedItemsPerStep] = useState<Record<number, Record<string, number>>>({});
+  
+  // Controla quais etapas estão ativas (incluídas no pedido)
+  const [activeSteps, setActiveSteps] = useState<Set<number>>(new Set());
 
   // Carrega insumos do DB
   React.useEffect(() => {
@@ -34,38 +39,84 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
 
   const selectedService = useMemo(() => services.find(s => s.id === selectedServiceId), [services, selectedServiceId]);
 
+  // Inicializar etapas ativas quando um serviço é selecionado
+  React.useEffect(() => {
+    if (selectedService?.config?.subOrders) {
+      const steps = selectedService.config.subOrders;
+      // Por padrão, todas as etapas começam ativas
+      setActiveSteps(new Set(steps.map((_, idx) => idx)));
+      // Limpar seleções de itens ao trocar de serviço
+      setSelectedItemsPerStep({});
+    }
+  }, [selectedServiceId]);
+
+  // Alternar etapa ativa/inativa
+  const toggleStep = (stepIdx: number) => {
+    setActiveSteps(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(stepIdx)) {
+        newSet.delete(stepIdx);
+        // Remover itens selecionados da etapa desativada
+        setSelectedItemsPerStep(prevItems => {
+          const newItems = { ...prevItems };
+          delete newItems[stepIdx];
+          return newItems;
+        });
+      } else {
+        newSet.add(stepIdx);
+      }
+      return newSet;
+    });
+  };
+
+  // Atualizar quantidade de item (limitado a 1 por etapa)
   const updateItemQuantity = (stepIdx: number, itemId: string, delta: number) => {
     setSelectedItemsPerStep(prev => {
       const stepData = { ...(prev[stepIdx] || {}) };
       const currentQty = stepData[itemId] || 0;
       const newQty = Math.max(0, currentQty + delta);
       
-      if (newQty === 0) delete stepData[itemId];
-      else stepData[itemId] = newQty;
+      if (newQty === 0) {
+        delete stepData[itemId];
+      } else {
+        // NOVA REGRA: Apenas 1 insumo por etapa
+        // Se está adicionando um item, remove todos os outros da mesma etapa
+        if (delta > 0 && newQty > 0) {
+          // Limpar todos os outros itens desta etapa e manter apenas este
+          const newStepData: Record<string, number> = { [itemId]: 1 };
+          return { ...prev, [stepIdx]: newStepData };
+        } else {
+          stepData[itemId] = newQty;
+        }
+      }
 
       return { ...prev, [stepIdx]: stepData };
     });
   };
 
-  // Validação: Pelo menos um item por etapa
+  // Validação: Pelo menos um item por etapa ATIVA
   const validation = useMemo(() => {
     if (!selectedService) return { isValid: false, missingSteps: [] };
     
     const steps = selectedService.config?.subOrders || [{ name: 'Atendimento Geral', allowedItemIds: [] }];
     const missingSteps: number[] = [];
 
-    steps.forEach((_, idx) => {
-      const itemsInStep = Object.keys(selectedItemsPerStep[idx] || {}).length;
+    // Validar apenas etapas ativas
+    activeSteps.forEach(stepIdx => {
+      const itemsInStep = Object.keys(selectedItemsPerStep[stepIdx] || {}).length;
       if (itemsInStep === 0) {
-        missingSteps.push(idx);
+        missingSteps.push(stepIdx);
       }
     });
 
+    // Deve ter pelo menos uma etapa ativa
+    const hasActiveSteps = activeSteps.size > 0;
+
     return {
-      isValid: missingSteps.length === 0 && selectedBedId !== '' && selectedServiceId !== '',
+      isValid: missingSteps.length === 0 && selectedBedId !== '' && selectedServiceId !== '' && hasActiveSteps,
       missingSteps
     };
-  }, [selectedService, selectedItemsPerStep, selectedBedId, selectedServiceId]);
+  }, [selectedService, selectedItemsPerStep, selectedBedId, selectedServiceId, activeSteps]);
 
   const totalCost = useMemo(() => {
     let total = 0;
@@ -85,8 +136,12 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
     setIsSubmitting(true);
     try {
       const stepsItems: Record<number, { itemId: string, quantity: number }[]> = {};
+      // Incluir apenas itens de etapas ativas
       Object.entries(selectedItemsPerStep).forEach(([idx, items]) => {
-        stepsItems[parseInt(idx)] = Object.entries(items).map(([id, qty]) => ({ itemId: id, quantity: qty }));
+        const stepIdx = parseInt(idx);
+        if (activeSteps.has(stepIdx)) {
+          stepsItems[stepIdx] = Object.entries(items).map(([id, qty]) => ({ itemId: id, quantity: qty }));
+        }
       });
 
       await db.createOrdersFromService({
@@ -94,7 +149,8 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
         serviceId: selectedServiceId,
         userId: currentUser.id,
         companyId: currentUser.companyId,
-        stepsItems
+        stepsItems,
+        activeSteps: Array.from(activeSteps) // Passar etapas ativas para o backend
       });
       onSuccess();
     } catch (error) {
@@ -115,7 +171,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
           </div>
           <div>
             <h3 className="text-xl font-bold text-slate-800">Nova Solicitação de Fluxo</h3>
-            <p className="text-slate-500 text-sm">Selecione obrigatoriamente um item para cada etapa.</p>
+            <p className="text-slate-500 text-sm">Escolha quais etapas incluir e selecione 1 insumo por etapa.</p>
           </div>
         </div>
         
@@ -194,45 +250,90 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                </div>
                
                {(selectedService.config?.subOrders || [{ name: 'Atendimento Geral', allowedItemIds: [] }]).map((sub, idx) => {
-                  const allowedItems = complementItems.filter(item => sub.allowedItemIds?.includes(item.id));
+                  // Buscar dados da etapa se stepId estiver presente
+                  const step = sub.stepId ? steps.find(s => s.id === sub.stepId) : null;
+                  const stepName = step?.name || sub.name || `Etapa ${idx + 1}`;
+                  const stepItemIds = step?.allowedItemIds || sub.allowedItemIds || [];
+                  
+                  const allowedItems = complementItems.filter(item => stepItemIds.includes(item.id));
                   const isMissing = validation.missingSteps.includes(idx);
+                  const isActive = activeSteps.has(idx);
                   
                   return (
-                    <div key={idx} className={`border rounded-2xl p-6 transition-all ${isMissing ? 'bg-rose-50/30 border-rose-200' : 'bg-slate-50/50 border-slate-200'}`}>
+                    <div key={idx} className={`border rounded-2xl p-6 transition-all ${!isActive ? 'bg-slate-100/50 border-slate-300 opacity-60' : isMissing ? 'bg-rose-50/30 border-rose-200' : 'bg-slate-50/50 border-slate-200'}`}>
                        <div className="flex justify-between items-center mb-4">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${isMissing ? 'bg-rose-500 text-white' : 'bg-slate-900 text-white'}`}>
-                              {idx + 1}
-                            </span>
-                            <span className={`text-sm font-black uppercase tracking-tight ${isMissing ? 'text-rose-600' : 'text-slate-800'}`}>{sub.name}</span>
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isActive}
+                                onChange={() => toggleStep(idx)}
+                                className="w-5 h-5 rounded border-slate-300 text-sky-600 focus:ring-sky-500 focus:ring-2"
+                              />
+                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black ${!isActive ? 'bg-slate-400 text-white' : isMissing ? 'bg-rose-500 text-white' : 'bg-slate-900 text-white'}`}>
+                                {idx + 1}
+                              </span>
+                              <span className={`text-sm font-black uppercase tracking-tight ${!isActive ? 'text-slate-500' : isMissing ? 'text-rose-600' : 'text-slate-800'}`}>{stepName}</span>
+                            </label>
                           </div>
-                          {isMissing && <AlertCircle size={16} className="text-rose-400" />}
+                          <div className="flex items-center gap-2">
+                            {!isActive && (
+                              <span className="text-[9px] font-black text-slate-500 bg-slate-200 px-2 py-1 rounded-full">
+                                DESATIVADA
+                              </span>
+                            )}
+                            {isActive && isMissing && <AlertCircle size={16} className="text-rose-400" />}
+                          </div>
                        </div>
 
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
-                         {allowedItems.length > 0 ? (
-                           allowedItems.map(item => {
-                              const qty = selectedItemsPerStep[idx]?.[item.id] || 0;
-                              return (
-                                <div key={item.id} className={`p-3 md:p-4 rounded-lg md:rounded-xl border transition-all flex items-center justify-between ${qty > 0 ? 'bg-white border-sky-300 shadow-md' : 'bg-white/50 border-slate-100 hover:border-slate-300'}`}>
-                                   <div className="flex-1 pr-2">
-                                      <p className="text-[11px] font-black text-slate-700 uppercase leading-tight">{item.name}</p>
-                                      {showCosts && <p className="text-[10px] text-emerald-600 font-bold mt-1">R$ {item.unitCost.toFixed(2)}</p>}
-                                   </div>
-                                   <div className="flex items-center space-x-3 bg-slate-50 px-2 py-1 rounded-lg">
-                                      <button type="button" onClick={() => updateItemQuantity(idx, item.id, -1)} className="p-1 hover:bg-slate-200 rounded text-slate-400"><Minus size={14} /></button>
-                                      <span className="text-xs font-black text-slate-800 w-4 text-center">{qty}</span>
-                                      <button type="button" onClick={() => updateItemQuantity(idx, item.id, 1)} className="p-1 hover:bg-slate-200 rounded text-sky-600"><Plus size={14} /></button>
-                                   </div>
-                                </div>
-                              );
-                           })
-                         ) : (
-                           <div className="col-span-2 py-4 text-center border-2 border-dashed border-slate-200 rounded-xl">
-                              <p className="text-[10px] text-slate-400 font-bold uppercase italic">Sem itens extras configurados para esta etapa.</p>
-                           </div>
-                         )}
-                       </div>
+                       {isActive ? (
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
+                           {allowedItems.length > 0 ? (
+                             allowedItems.map(item => {
+                                const qty = selectedItemsPerStep[idx]?.[item.id] || 0;
+                                const hasOtherItem = Object.keys(selectedItemsPerStep[idx] || {}).some(id => id !== item.id && (selectedItemsPerStep[idx]?.[id] || 0) > 0);
+                                return (
+                                  <div key={item.id} className={`p-3 md:p-4 rounded-lg md:rounded-xl border transition-all flex items-center justify-between ${qty > 0 ? 'bg-white border-sky-300 shadow-md ring-2 ring-sky-200' : hasOtherItem ? 'bg-slate-100/50 border-slate-200 opacity-50' : 'bg-white/50 border-slate-100 hover:border-slate-300'}`}>
+                                     <div className="flex-1 pr-2">
+                                        <p className={`text-[11px] font-black uppercase leading-tight ${qty > 0 ? 'text-slate-700' : hasOtherItem ? 'text-slate-400' : 'text-slate-700'}`}>{item.name}</p>
+                                        {showCosts && <p className="text-[10px] text-emerald-600 font-bold mt-1">R$ {item.unitCost.toFixed(2)}</p>}
+                                        {qty > 0 && (
+                                          <p className="text-[9px] text-sky-600 font-black mt-1">✓ Selecionado</p>
+                                        )}
+                                     </div>
+                                     <div className="flex items-center space-x-3 bg-slate-50 px-2 py-1 rounded-lg">
+                                        <button 
+                                          type="button" 
+                                          onClick={() => updateItemQuantity(idx, item.id, -1)} 
+                                          disabled={qty === 0 || hasOtherItem}
+                                          className={`p-1 rounded ${qty === 0 || hasOtherItem ? 'text-slate-300 cursor-not-allowed' : 'hover:bg-slate-200 text-slate-400'}`}
+                                        >
+                                          <Minus size={14} />
+                                        </button>
+                                        <span className={`text-xs font-black w-4 text-center ${qty > 0 ? 'text-sky-600' : 'text-slate-400'}`}>{qty}</span>
+                                        <button 
+                                          type="button" 
+                                          onClick={() => updateItemQuantity(idx, item.id, 1)} 
+                                          disabled={hasOtherItem}
+                                          className={`p-1 rounded ${hasOtherItem ? 'text-slate-300 cursor-not-allowed' : 'hover:bg-slate-200 text-sky-600'}`}
+                                        >
+                                          <Plus size={14} />
+                                        </button>
+                                     </div>
+                                  </div>
+                                );
+                             })
+                           ) : (
+                             <div className="col-span-2 py-4 text-center border-2 border-dashed border-slate-200 rounded-xl">
+                                <p className="text-[10px] text-slate-400 font-bold uppercase italic">Sem itens extras configurados para esta etapa.</p>
+                             </div>
+                           )}
+                         </div>
+                       ) : (
+                         <div className="py-4 text-center border-2 border-dashed border-slate-300 rounded-xl bg-slate-100/30">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase italic">Etapa desativada - não será incluída no pedido</p>
+                         </div>
+                       )}
                     </div>
                   );
                })}
@@ -268,7 +369,9 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                  {Object.entries(selectedItemsPerStep).map(([stepIdx, items]) => (
                    Object.entries(items).map(([itemId, qty]) => {
                      const item = complementItems.find(i => i.id === itemId);
-                     const subName = (selectedService?.config?.subOrders || [])[parseInt(stepIdx)]?.name || 'Geral';
+                     const sub = (selectedService?.config?.subOrders || [])[parseInt(stepIdx)];
+                     const step = sub?.stepId ? steps.find(s => s.id === sub.stepId) : null;
+                     const subName = step?.name || sub?.name || 'Geral';
                      return (
                        <div key={`${stepIdx}-${itemId}`} className="flex justify-between items-start gap-4">
                           <div className="flex-1">

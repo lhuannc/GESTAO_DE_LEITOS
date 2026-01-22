@@ -42,11 +42,23 @@ export interface ComplementItem {
   companyId: string;
 }
 
-export interface SubOrderConfig {
+// Etapa independente (cadastrada separadamente)
+export interface Step {
+  id: string;
   name: string;
-  initialStatus: OSStatus;
-  targetTeamId: string;
-  allowedItemIds?: string[]; // IDs dos itens que podem ser adicionados nesta etapa
+  companyId: string;
+  targetTeamId: string; // Equipe responsável pela etapa
+  allowedItemIds: string[]; // IDs dos insumos permitidos nesta etapa
+  slaMinutes?: number; // SLA em minutos (tempo máximo esperado)
+}
+
+export interface SubOrderConfig {
+  stepId: string; // ID da etapa cadastrada (referência)
+  // Mantido para compatibilidade com dados antigos
+  name?: string;
+  initialStatus?: OSStatus;
+  targetTeamId?: string;
+  allowedItemIds?: string[];
 }
 
 export interface ServiceType {
@@ -116,4 +128,4 @@ export interface ServiceOrder {
   }[];
 }
 
-export type ViewType = 'DASHBOARD' | 'SOLICITAR' | 'ORDENS' | 'CADASTROS';
+export type ViewType = 'DASHBOARD' | 'DASHBOARD_OPERACIONAL' | 'SOLICITAR' | 'ORDENS' | 'CADASTROS';

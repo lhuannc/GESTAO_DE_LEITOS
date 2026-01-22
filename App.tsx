@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  LayoutDashboard, ClipboardPlus, Settings, Kanban, LogOut, Menu, X, Loader2, RefreshCw
+  LayoutDashboard, ClipboardPlus, Settings, Kanban, LogOut, Menu, X, Loader2, RefreshCw, ChevronDown, ChevronRight, TrendingUp
 } from 'lucide-react';
 import { 
-  Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, ServiceOrder, ViewType, Team, ComplementItem 
+  Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, ServiceOrder, ViewType, Team, ComplementItem, Step
 } from './types';
 import Dashboard from './components/Dashboard';
+import DashboardOperacional from './components/DashboardOperacional';
 import ServiceRequestForm from './components/ServiceRequestForm';
 import ServiceOrdersKanban from './components/ServiceOrdersKanban';
 import RegistrationManager from './components/RegistrationManager';
@@ -26,6 +27,7 @@ const App: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [complementItems, setComplementItems] = useState<ComplementItem[]>([]);
+  const [steps, setSteps] = useState<Step[]>([]);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   
   const [activeView, setActiveView] = useState<ViewType>('DASHBOARD');
@@ -45,6 +47,7 @@ const App: React.FC = () => {
     setUsers((data.users || []).filter(Boolean));
     setTeams((data.teams || []).filter(Boolean));
     setComplementItems((data.complementItems || []).filter(Boolean));
+    setSteps((data.steps || []).filter(Boolean));
     setServiceOrders((data.orders || []).filter(Boolean));
     
     setLoading(false);
@@ -124,14 +127,18 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100">
-      <aside className={`bg-slate-900 text-white transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'} md:w-64 flex flex-col z-20 shadow-xl`}>
+      <aside className={`bg-slate-900 text-white transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'} flex flex-col z-20 shadow-xl`}>
         <div className="p-4 md:p-6 flex items-center justify-between border-b border-slate-800 shrink-0">
           <h1 className={`font-bold text-lg md:text-xl text-sky-400 truncate transition-opacity ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>Gestão de Leitos</h1>
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><Menu size={20} /></button>
         </div>
 
         <nav className="flex-1 mt-6 space-y-2 px-3 overflow-y-auto scrollbar-hide">
-          <SidebarItem icon={<LayoutDashboard size={20} />} label="Dashboard" active={activeView === 'DASHBOARD'} collapsed={!isSidebarOpen} onClick={() => setActiveView('DASHBOARD')} />
+          <DashboardSubmenu 
+            isSidebarOpen={isSidebarOpen} 
+            activeView={activeView} 
+            setActiveView={setActiveView} 
+          />
           <SidebarItem icon={<ClipboardPlus size={20} />} label="Solicitar" active={activeView === 'SOLICITAR'} collapsed={!isSidebarOpen} onClick={() => setActiveView('SOLICITAR')} />
           
           {canAccessKanban && (
@@ -170,17 +177,86 @@ const App: React.FC = () => {
           
           <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-slate-200 min-h-full p-4 md:p-6">
             {activeView === 'DASHBOARD' && <Dashboard beds={beds} orders={serviceOrders} users={users} services={services} />}
-            {activeView === 'SOLICITAR' && <ServiceRequestForm beds={beds} services={services} actions={actions} currentUser={currentUser} onSuccess={async () => { await loadAllData(); setActiveView('DASHBOARD'); }} />}
+            {activeView === 'DASHBOARD_OPERACIONAL' && <DashboardOperacional beds={beds} orders={serviceOrders} services={services} steps={steps} />}
+            {activeView === 'SOLICITAR' && <ServiceRequestForm beds={beds} services={services} actions={actions} currentUser={currentUser} steps={steps} onSuccess={async () => { await loadAllData(); setActiveView('DASHBOARD'); }} />}
             {activeView === 'ORDENS' && canAccessKanban && <ServiceOrdersKanban orders={serviceOrders} services={services} actions={actions} beds={beds} currentUser={currentUser} teams={teams} users={users} onUpdateOrder={handleUpdateOrder} onCompleteOrder={() => loadAllData()} />}
             {activeView === 'CADASTROS' && currentUser.permissions.isAdmin && (
               <RegistrationManager 
-                currentUser={currentUser} companies={companies} units={units} sectors={sectors} beds={beds} services={services} actions={actions} users={users} teams={teams} complementItems={complementItems}
+                currentUser={currentUser} companies={companies} units={units} sectors={sectors} beds={beds} services={services} actions={actions} users={users} teams={teams} complementItems={complementItems} steps={steps}
                 onSave={handleSaveRegistry} onDelete={handleDeleteRegistry}
               />
             )}
           </div>
         </main>
       </div>
+    </div>
+  );
+};
+
+const DashboardSubmenu: React.FC<{ 
+  isSidebarOpen: boolean; 
+  activeView: ViewType; 
+  setActiveView: (view: ViewType) => void 
+}> = ({ isSidebarOpen, activeView, setActiveView }) => {
+  const isDashboardActive = activeView === 'DASHBOARD' || activeView === 'DASHBOARD_OPERACIONAL';
+  const [isExpanded, setIsExpanded] = useState(isDashboardActive);
+  
+  // Expandir automaticamente quando muda para uma view de dashboard
+  useEffect(() => {
+    if (isDashboardActive && isSidebarOpen) {
+      setIsExpanded(true);
+    }
+  }, [isDashboardActive, isSidebarOpen]);
+
+  // Quando sidebar está fechado, abre o dashboard geral ao clicar
+  if (!isSidebarOpen) {
+    return (
+      <button 
+        onClick={() => setActiveView('DASHBOARD')}
+        className={`w-full flex items-center justify-center p-3 rounded-xl transition-all ${isDashboardActive ? 'bg-sky-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-100'}`}
+        title="Dashboard"
+      >
+        <LayoutDashboard size={20} />
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      <button 
+        onClick={() => setIsExpanded(!isExpanded)} 
+        className={`w-full flex items-center justify-between p-3 rounded-xl transition-all ${isDashboardActive ? 'bg-sky-600 text-white shadow-lg' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-100'}`}
+      >
+        <div className="flex items-center space-x-3">
+          <LayoutDashboard size={20} />
+          <span className="font-semibold whitespace-nowrap text-sm">Dashboard</span>
+        </div>
+        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+      </button>
+      {isExpanded && (
+        <div className="ml-8 mt-1 space-y-1">
+          <button
+            onClick={() => {
+              setActiveView('DASHBOARD');
+              setIsExpanded(false);
+            }}
+            className={`w-full flex items-center space-x-3 p-2 rounded-lg transition-all text-sm ${activeView === 'DASHBOARD' ? 'bg-sky-500/50 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'}`}
+          >
+            <TrendingUp size={16} />
+            <span>Geral</span>
+          </button>
+          <button
+            onClick={() => {
+              setActiveView('DASHBOARD_OPERACIONAL');
+              setIsExpanded(false);
+            }}
+            className={`w-full flex items-center space-x-3 p-2 rounded-lg transition-all text-sm ${activeView === 'DASHBOARD_OPERACIONAL' ? 'bg-sky-500/50 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'}`}
+          >
+            <LayoutDashboard size={16} />
+            <span>Operacional</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
