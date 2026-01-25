@@ -1,5 +1,5 @@
 
-import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, BedStatus, Team, ComplementItem, Step } from './types';
+import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, BedStatus, Team, ComplementItem, Step, BedStatusConfig } from './types';
 
 export const INITIAL_COMPANY: Company = {
   id: 'c1',
@@ -116,10 +116,10 @@ export const INITIAL_STEPS: Step[] = [
   }
 ];
 
-export const BED_STATUS_COLORS: Record<BedStatus, string> = {
-  DISPONIVEL: 'bg-emerald-500',
-  OCUPADO: 'bg-rose-500',
-  HIGIENIZACAO: 'bg-amber-500',
-  MANUTENCAO: 'bg-slate-500',
-  AGUARDANDO_ALTA: 'bg-sky-500'
-};
+export const INITIAL_BED_STATUS_CONFIGS: BedStatusConfig[] = [
+  { id: 'DISPONIVEL', name: 'Disponível', color: 'bg-emerald-500', companyId: 'c1', isDefault: true },
+  { id: 'OCUPADO', name: 'Ocupado', color: 'bg-rose-500', companyId: 'c1', isDefault: true },
+  { id: 'HIGIENIZACAO', name: 'Higienização', color: 'bg-amber-500', companyId: 'c1', isDefault: true },
+  { id: 'MANUTENCAO', name: 'Manutenção', color: 'bg-slate-500', companyId: 'c1', isDefault: true },
+  { id: 'AGUARDANDO_ALTA', name: 'Aguardando Alta', color: 'bg-sky-500', companyId: 'c1', isDefault: true }
+];

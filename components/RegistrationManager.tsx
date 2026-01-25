@@ -1,16 +1,16 @@
 
 import React, { useState, useMemo } from 'react';
-import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, OSStatus, SubOrderConfig, Team, ComplementItem, Step } from '../types';
+import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, OSStatus, SubOrderConfig, Team, ComplementItem, Step, BedStatusConfig } from '../types';
 import { 
   Building2, Hospital, Layers, Bed as BedIcon, Settings, 
   Users, Plus, Trash2, Edit2, X, Save,
   ListPlus, Info, Users2, ArrowDown, ArrowUp, Lock,
   Package, DollarSign, CheckSquare, Link as LinkIcon,
-  UserCheck, Mail, ShieldCheck, Fingerprint, CreditCard, Clock
+  UserCheck, Mail, ShieldCheck, Fingerprint, CreditCard, Clock, Palette
 } from 'lucide-react';
 import { maskCPF, unmaskCPF, md5 } from '../utils';
 
-type TabId = 'empresa' | 'unidade' | 'setor' | 'leito' | 'servico' | 'usuario' | 'equipe' | 'insumo' | 'etapa';
+type TabId = 'empresa' | 'unidade' | 'setor' | 'leito' | 'servico' | 'usuario' | 'equipe' | 'insumo' | 'etapa' | 'status';
 
 interface RegistrationManagerProps {
   currentUser: User;
@@ -24,6 +24,7 @@ interface RegistrationManagerProps {
   teams: Team[];
   complementItems?: ComplementItem[]; // Adicionado via DB
   steps?: Step[]; // Etapas cadastradas
+  bedStatusConfigs?: BedStatusConfig[]; // Configurações de status
   onSave: (type: string, item: any) => Promise<void>;
   onDelete: (type: string, id: string) => Promise<void>;
 }
@@ -39,6 +40,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
   teams,
   complementItems = [],
   steps = [],
+  bedStatusConfigs = [],
   onSave,
   onDelete
 }) => {
@@ -54,7 +56,8 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
     { id: 'leito' as TabId, label: 'Leitos', icon: <BedIcon size={18} />, module: 'bed' },
     { id: 'equipe' as TabId, label: 'Equipes', icon: <Users2 size={18} />, module: 'team' },
     { id: 'insumo' as TabId, label: 'Insumos / Extras', icon: <Package size={18} />, module: 'complementItem' },
-    { id: 'etapa' as TabId, label: 'Etapas', icon: <ListPlus size={18} />, module: 'step' },
+    { id: 'etapa' as TabId, label: 'Ações', icon: <ListPlus size={18} />, module: 'step' },
+    { id: 'status' as TabId, label: 'Status de Leito', icon: <Palette size={18} />, module: 'bedStatusConfig' },
     { id: 'servico' as TabId, label: 'Fluxos (Serviços)', icon: <Settings size={18} />, module: 'service' },
     { id: 'usuario' as TabId, label: 'Usuários', icon: <Users size={18} />, module: 'user' },
   ], []);
@@ -72,9 +75,10 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       case 'equipe': return teams.filter(t => isAdmin || t.companyId === cid);
       case 'insumo': return complementItems.filter(i => isAdmin || i.companyId === cid);
       case 'etapa': return steps.filter(s => isAdmin || s.companyId === cid);
+      case 'status': return bedStatusConfigs.filter(s => isAdmin || s.companyId === cid);
       default: return [];
     }
-  }, [activeTab, companies, units, sectors, beds, services, users, teams, complementItems, steps, currentUser]);
+  }, [activeTab, companies, units, sectors, beds, services, users, teams, complementItems, steps, bedStatusConfigs, currentUser]);
 
   const getAssociationsForItem = (itemId: string) => {
     const associations: { serviceName: string; stepName: string }[] = [];
@@ -99,6 +103,8 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       baseData.targetTeamId = '';
       baseData.allowedItemIds = [];
       baseData.slaMinutes = '';
+    } else if (activeTab === 'status') {
+      baseData.color = 'bg-slate-500';
     } else if (activeTab === 'equipe') {
       baseData.userIds = [];
     } else if (activeTab === 'usuario') {
@@ -158,7 +164,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
     const typeMap: Record<TabId, string> = {
       empresa: 'companies', unidade: 'units', setor: 'sectors', leito: 'beds', 
       servico: 'services', usuario: 'users', equipe: 'teams', insumo: 'complementItems',
-      etapa: 'steps'
+      etapa: 'steps', status: 'bedStatusConfigs'
     };
     
     // Se for usuário, processar CPF e gerar hash
@@ -270,7 +276,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                         )}
                         {activeTab === 'servico' && (
                           <div className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">
-                            {item.config?.generateMultipleOS ? `${item.config.subOrders?.length} Etapas Configuradas` : 'OS de Fluxo Único'}
+                            {item.config?.generateMultipleOS ? `${item.config.subOrders?.length} Ações Configuradas` : 'OS de Fluxo Único'}
                             {item.config?.subOrders && item.config.subOrders.length > 0 && (() => {
                               const totalSLA = item.config.subOrders.reduce((total: number, sub: SubOrderConfig) => {
                                 const step = steps.find(s => s.id === sub.stepId);
@@ -378,6 +384,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                       ))}
                     </select>
                   </div>
+
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                       <BedIcon size={14} className="text-sky-500" /> Status
@@ -387,11 +394,24 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                       onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                       className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none text-sm font-bold text-slate-700"
                     >
-                      <option value="DISPONIVEL">Disponível</option>
-                      <option value="OCUPADO">Ocupado</option>
-                      <option value="HIGIENIZACAO">Higienização</option>
-                      <option value="MANUTENCAO">Manutenção</option>
-                      <option value="AGUARDANDO_ALTA">Aguardando Alta</option>
+                      {(() => {
+                        const availableStatuses = bedStatusConfigs.filter(s => s.companyId === (formData.companyId || currentUser.companyId));
+                        if (availableStatuses.length > 0) {
+                          return availableStatuses.map(config => (
+                            <option key={config.id} value={config.id}>{config.name}</option>
+                          ));
+                        }
+                        // Fallback apenas se não houver NENHUM status cadastrado para a empresa
+                        return (
+                          <>
+                             <option value="DISPONIVEL">Disponível</option>
+                             <option value="OCUPADO">Ocupado</option>
+                             <option value="HIGIENIZACAO">Higienização</option>
+                             <option value="MANUTENCAO">Manutenção</option>
+                             <option value="AGUARDANDO_ALTA">Aguardando Alta</option>
+                          </>
+                        );
+                      })()}
                     </select>
                   </div>
                 </>
@@ -485,6 +505,35 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                 </div>
               )}
 
+              {activeTab === 'status' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block flex items-center gap-2">
+                      <Palette size={14} className="text-sky-500" /> Cor do Status
+                    </label>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
+                      {[
+                        'bg-emerald-500', 'bg-green-500', 'bg-lime-500',
+                        'bg-teal-500', 'bg-cyan-500', 'bg-sky-500',
+                        'bg-blue-500', 'bg-indigo-500', 'bg-violet-500',
+                        'bg-purple-500', 'bg-fuchsia-500', 'bg-pink-500',
+                        'bg-rose-500', 'bg-red-500', 'bg-orange-500',
+                        'bg-amber-500', 'bg-yellow-500', 'bg-slate-500'
+                      ].map(color => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setFormData({...formData, color})}
+                          className={`h-12 rounded-xl transition-all ${formData.color === color ? 'ring-4 ring-offset-2 ring-sky-500 scale-95' : 'hover:scale-105 hover:shadow-lg'}`}
+                        >
+                          <div className={`w-full h-full rounded-lg ${color}`}></div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {activeTab === 'equipe' && (
                 <div className="space-y-4">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block flex items-center gap-2">
@@ -538,7 +587,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                         {formData.config.subOrders?.map((sub: SubOrderConfig, idx: number) => {
                           // Buscar etapa completa se tiver stepId
                           const step = sub.stepId ? steps.find(s => s.id === sub.stepId) : null;
-                          const stepName = step?.name || sub.name || `Etapa ${idx + 1}`;
+                          const stepName = step?.name || sub.name || `Ação ${idx + 1}`;
                           const stepTeamId = step?.targetTeamId || sub.targetTeamId || '';
                           const stepItemIds = step?.allowedItemIds || sub.allowedItemIds || [];
                           
@@ -565,7 +614,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                                    className="flex-1 text-xs font-bold p-2 bg-slate-50 rounded-lg outline-none"
                                    required
                                  >
-                                   <option value="">Selecione uma etapa...</option>
+                                   <option value="">Selecione uma ação...</option>
                                    {steps.filter(s => s.companyId === formData.companyId).map(s => (
                                      <option key={s.id} value={s.id}>{s.name}</option>
                                    ))}
@@ -576,6 +625,79 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                                  }} className="text-rose-400 p-2 ml-2 hover:bg-rose-50 rounded-xl"><Trash2 size={16} /></button>
                                </div>
                                
+                               {/* Bed Status Configuration */}
+                               <div className="flex gap-2 pt-2 border-t border-sky-100/50">
+                                  <div className="flex-1">
+                                    <label className="text-[9px] font-black text-sky-700 uppercase block mb-1">Status ao Iniciar</label>
+                                    <select 
+                                      value={sub.bedStatusConfig?.onStart || ''}
+                                      onChange={(e) => {
+                                        const subOrders = [...formData.config.subOrders];
+                                        subOrders[idx] = { 
+                                          ...subOrders[idx], 
+                                          bedStatusConfig: { 
+                                            ...subOrders[idx].bedStatusConfig, 
+                                            onStart: e.target.value || undefined 
+                                          } 
+                                        };
+                                        setFormData({...formData, config: {...formData.config, subOrders}});
+                                      }}
+                                      className="w-full text-[10px] p-1.5 bg-white border border-sky-200 rounded-lg outline-none text-slate-600"
+                                    >
+                                      <option value="">Manter atual</option>
+                                      {(() => {
+                                        const availableStatuses = bedStatusConfigs.filter(s => s.companyId === (formData.companyId || currentUser.companyId));
+                                        if (availableStatuses.length > 0) {
+                                          return availableStatuses.map(config => (
+                                            <option key={config.id} value={config.id}>{config.name}</option>
+                                          ));
+                                        }
+                                        return (
+                                          <>
+                                             <option value="OCUPADO">Ocupado</option>
+                                             <option value="HIGIENIZACAO">Higienização</option>
+                                             <option value="MANUTENCAO">Manutenção</option>
+                                          </>
+                                        );
+                                      })()}
+                                    </select>
+                                  </div>
+                                  <div className="flex-1">
+                                    <label className="text-[9px] font-black text-sky-700 uppercase block mb-1">Status ao Finalizar</label>
+                                    <select 
+                                      value={sub.bedStatusConfig?.onFinish || ''}
+                                      onChange={(e) => {
+                                        const subOrders = [...formData.config.subOrders];
+                                        subOrders[idx] = { 
+                                          ...subOrders[idx], 
+                                          bedStatusConfig: { 
+                                            ...subOrders[idx].bedStatusConfig, 
+                                            onFinish: e.target.value || undefined 
+                                          } 
+                                        };
+                                        setFormData({...formData, config: {...formData.config, subOrders}});
+                                      }}
+                                      className="w-full text-[10px] p-1.5 bg-white border border-sky-200 rounded-lg outline-none text-slate-600"
+                                    >
+                                      <option value="">Manter atual</option>
+                                      {(() => {
+                                        const availableStatuses = bedStatusConfigs.filter(s => s.companyId === (formData.companyId || currentUser.companyId));
+                                        if (availableStatuses.length > 0) {
+                                          return availableStatuses.map(config => (
+                                            <option key={config.id} value={config.id}>{config.name}</option>
+                                          ));
+                                        }
+                                        return (
+                                          <>
+                                             <option value="DISPONIVEL">Disponível</option>
+                                             <option value="AGUARDANDO_ALTA">Aguardando Alta</option>
+                                          </>
+                                        );
+                                      })()}
+                                    </select>
+                                  </div>
+                               </div>
+
                                {step && (
                                  <div className="p-3 bg-sky-50 rounded-xl border border-sky-100 space-y-2">
                                    <div className="flex items-center justify-between">
@@ -599,12 +721,12 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                           );
                         })}
                         <button type="button" onClick={addSubOrder} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-xs font-bold text-slate-400 hover:text-sky-500 hover:border-sky-300 flex items-center justify-center space-x-2 bg-slate-50/30">
-                          <Plus size={16} /> <span>Adicionar Etapa ao Fluxo</span>
+                          <Plus size={16} /> <span>Adicionar Ação ao Fluxo</span>
                         </button>
                         {steps.filter(s => s.companyId === formData.companyId).length === 0 && (
                           <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
                             <p className="text-[10px] font-black text-amber-700 uppercase">
-                              ⚠️ Nenhuma etapa cadastrada. Cadastre etapas primeiro na aba "Etapas".
+                              ⚠️ Nenhuma ação cadastrada. Cadastre ações primeiro na aba "Ações".
                             </p>
                           </div>
                         )}

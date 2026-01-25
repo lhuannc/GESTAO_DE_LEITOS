@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { Bed, ServiceOrder, ServiceType, Step } from '../types';
+import { Bed, ServiceOrder, ServiceType, Step, BedStatusConfig } from '../types';
 import { Layers, Clock, CheckCircle2, Circle, PlayCircle, Lock, AlertCircle } from 'lucide-react';
 
 interface DashboardOperacionalProps {
@@ -8,6 +8,7 @@ interface DashboardOperacionalProps {
   orders: ServiceOrder[];
   services: ServiceType[];
   steps: Step[];
+  bedStatusConfigs?: BedStatusConfig[];
 }
 
 // Função auxiliar para calcular tempo entre duas datas em minutos
@@ -98,7 +99,7 @@ const calculateTimeFromPendingToCompletion = (order: ServiceOrder): number => {
   return (fim.getTime() - inicioPendente.getTime()) / (1000 * 60); // em minutos
 };
 
-const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, orders, services, steps }) => {
+const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, orders, services, steps, bedStatusConfigs = [] }) => {
   // Agrupar ordens por groupId e leito
   const leitosComFluxos = useMemo(() => {
     // Agrupar ordens por groupId
@@ -168,12 +169,9 @@ const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, order
     }
   };
 
-  const BED_STATUS_COLORS: Record<string, string> = {
-    DISPONIVEL: 'bg-emerald-500',
-    OCUPADO: 'bg-rose-500',
-    HIGIENIZACAO: 'bg-amber-500',
-    MANUTENCAO: 'bg-slate-500',
-    AGUARDANDO_ALTA: 'bg-sky-500'
+  const getBedStatusColor = (status: string) => {
+    const config = bedStatusConfigs.find(c => c.id === status);
+    return config?.color || 'bg-slate-500';
   };
 
   return (
@@ -194,16 +192,16 @@ const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, order
               <tr className="bg-slate-50 text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest">
                 <th className="w-32 px-2 md:px-3 py-2 md:py-2.5">Nome do Leito</th>
                 <th className="w-64 px-3 md:px-4 py-2 md:py-2.5">Serviço</th>
-                <th className="px-3 md:px-6 py-2 md:py-2.5">Fluxo de Etapas</th>
+                <th className="px-3 md:px-6 py-2 md:py-2.5">Fluxo de Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {todosLeitos.map((item) => {
                 return (
                   <tr key={item.bed.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="w-32 px-2 md:px-3 py-2 md:py-3">
+                    <td className="w-32 px-2 md:px-3 py-2 md:py-3 cursor-pointer" title={`Status: ${item.bed.status}`}>
                       <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${BED_STATUS_COLORS[item.bed.status]}`} />
+                        <div className={`w-2 h-2 rounded-full shrink-0 ${getBedStatusColor(item.bed.status)}`} />
                         <span className="text-xs md:text-sm font-black text-slate-800 uppercase whitespace-nowrap">{item.bed.name}</span>
                       </div>
                     </td>

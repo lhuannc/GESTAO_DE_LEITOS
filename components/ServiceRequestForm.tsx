@@ -28,6 +28,12 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
 
   // Estrutura: { stepIndex: { itemId: quantity } }
   const [selectedItemsPerStep, setSelectedItemsPerStep] = useState<Record<number, Record<string, number>>>({});
+
+  // Dependências entre fluxos: { stepIndex: orderId }
+  const [dependencies, setDependencies] = useState<Record<number, string>>({});
+  
+  // Ordens ativas para o leito selecionado (para seleção de dependência)
+  const [activeOrders, setActiveOrders] = useState<ServiceOrder[]>([]);
   
   // Controla quais etapas estão ativas (incluídas no pedido)
   const [activeSteps, setActiveSteps] = useState<Set<number>>(new Set());
@@ -36,6 +42,29 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
   React.useEffect(() => {
     db.getAllData().then(data => setComplementItems(data.complementItems || []));
   }, []);
+
+  // Buscar TODAS ordens ativas (de qualquer leito)
+  React.useEffect(() => {
+    const dbInstance = db.getDatabaseInstance();
+    if (dbInstance) {
+      // Remover filtro de bedId para permitir dependência entre leitos
+      const stmt = dbInstance.prepare("SELECT * FROM service_orders WHERE status != 'CONCLUIDO'");
+      const orders: ServiceOrder[] = [];
+      while (stmt.step()) {
+         const row = stmt.getAsObject();
+         orders.push({
+           id: row.id,
+           subServiceName: row.subServiceName || `Ação ${row.step + 1}`,
+           step: row.step,
+           status: row.status as any,
+           serviceId: row.serviceId,
+           bedId: row.bedId // Importante para agrupar/filtrar no UI
+         } as any);
+      }
+      stmt.free();
+      setActiveOrders(orders);
+    }
+  }, []); // Executar na montagem e não depender de selectedBedId para dependências globais
 
   const selectedService = useMemo(() => services.find(s => s.id === selectedServiceId), [services, selectedServiceId]);
 
@@ -47,6 +76,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
       setActiveSteps(new Set(steps.map((_, idx) => idx)));
       // Limpar seleções de itens ao trocar de serviço
       setSelectedItemsPerStep({});
+      setDependencies({});
     }
   }, [selectedServiceId]);
 
@@ -56,11 +86,16 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
       const newSet = new Set(prev);
       if (newSet.has(stepIdx)) {
         newSet.delete(stepIdx);
-        // Remover itens selecionados da etapa desativada
+        // Remover itens e dependências da etapa desativada
         setSelectedItemsPerStep(prevItems => {
           const newItems = { ...prevItems };
           delete newItems[stepIdx];
           return newItems;
+        });
+        setDependencies(prev => {
+          const newDeps = { ...prev };
+          delete newDeps[stepIdx];
+          return newDeps;
         });
       } else {
         newSet.add(stepIdx);
@@ -150,7 +185,8 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
         userId: currentUser.id,
         companyId: currentUser.companyId,
         stepsItems,
-        activeSteps: Array.from(activeSteps) // Passar etapas ativas para o backend
+        activeSteps: Array.from(activeSteps), // Passar etapas ativas para o backend
+        dependencies // Passar dependências
       });
       onSuccess();
     } catch (error) {
@@ -171,7 +207,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
           </div>
           <div>
             <h3 className="text-xl font-bold text-slate-800">Nova Solicitação de Fluxo</h3>
-            <p className="text-slate-500 text-sm">Escolha quais etapas incluir e selecione 1 insumo por etapa.</p>
+            <p className="text-slate-500 text-sm">Escolha quais ações incluir e selecione 1 insumo por ação.</p>
           </div>
         </div>
         
@@ -227,7 +263,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                     </span>
                     {service.config?.generateMultipleOS && (
                       <span className="flex items-center space-x-1 bg-white border border-sky-100 text-sky-600 text-[9px] px-2 py-0.5 rounded-full font-black uppercase shadow-sm">
-                        <Layers size={10} /> <span>{service.config.subOrders?.length} Etapas</span>
+                        <Layers size={10} /> <span>{service.config.subOrders?.length} Ações</span>
                       </span>
                     )}
                   </div>
@@ -240,7 +276,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
             <div className="space-y-4 pt-4">
                <div className="flex items-center justify-between">
                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                   <Package size={14} /> Itens por Etapa
+                   <Package size={14} /> Itens por Ação
                  </h4>
                  {validation.missingSteps.length > 0 && (
                    <span className="text-[9px] font-black text-rose-500 bg-rose-50 px-2 py-0.5 rounded-full animate-bounce">
@@ -252,7 +288,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                {(selectedService.config?.subOrders || [{ name: 'Atendimento Geral', allowedItemIds: [] }]).map((sub, idx) => {
                   // Buscar dados da etapa se stepId estiver presente
                   const step = sub.stepId ? steps.find(s => s.id === sub.stepId) : null;
-                  const stepName = step?.name || sub.name || `Etapa ${idx + 1}`;
+                  const stepName = step?.name || sub.name || `Ação ${idx + 1}`;
                   const stepItemIds = step?.allowedItemIds || sub.allowedItemIds || [];
                   
                   const allowedItems = complementItems.filter(item => stepItemIds.includes(item.id));
@@ -285,6 +321,43 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                             {isActive && isMissing && <AlertCircle size={16} className="text-rose-400" />}
                           </div>
                        </div>
+
+                        {isActive && activeOrders.length > 0 && (
+                          <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+                            <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block mb-1 flex items-center gap-1">
+                              <Layers size={12} /> Associar a Ação Existente (Dependência)
+                            </label>
+                            <select
+                              value={dependencies[idx] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setDependencies(prev => val ? ({ ...prev, [idx]: val }) : (() => {
+                                  const next = { ...prev };
+                                  delete next[idx];
+                                  return next;
+                                })());
+                              }}
+                              className="w-full text-xs p-2 bg-white border border-indigo-200 rounded-lg outline-none text-slate-600 focus:ring-2 focus:ring-indigo-200"
+                            >
+                              <option value="">Nenhuma (Iniciar imediatamente)</option>
+                              {activeOrders
+                                .filter(o => o.serviceId !== selectedServiceId) // Evitar circularidade simples no mesmo serviço (opcional)
+                                .map(o => {
+                                  const bedName = beds.find(b => b.id === o.bedId)?.name || 'Leito desconhecido';
+                                  return (
+                                    <option key={o.id} value={o.id}>
+                                      {bedName} - {o.subServiceName} ({o.status})
+                                    </option>
+                                  );
+                                })}
+                            </select>
+                            {dependencies[idx] && (
+                               <p className="text-[9px] text-indigo-400 mt-1 font-bold">
+                                 * Esta ação ficará BLOQUEADA até a conclusão da ação selecionada.
+                               </p>
+                            )}
+                          </div>
+                        )}
 
                        {isActive ? (
                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
@@ -325,7 +398,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                              })
                            ) : (
                              <div className="col-span-2 py-4 text-center border-2 border-dashed border-slate-200 rounded-xl">
-                                <p className="text-[10px] text-slate-400 font-bold uppercase italic">Sem itens extras configurados para esta etapa.</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase italic">Sem itens extras configurados para esta ação.</p>
                              </div>
                            )}
                          </div>

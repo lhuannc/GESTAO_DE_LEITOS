@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ClipboardPlus, Settings, Kanban, LogOut, Menu, X, Loader2, RefreshCw, ChevronDown, ChevronRight, TrendingUp
 } from 'lucide-react';
 import { 
-  Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, ServiceOrder, ViewType, Team, ComplementItem, Step
+  Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, ServiceOrder, ViewType, Team, ComplementItem, Step, BedStatusConfig
 } from './types';
 import Dashboard from './components/Dashboard';
 import DashboardOperacional from './components/DashboardOperacional';
@@ -28,6 +28,7 @@ const App: React.FC = () => {
   const [teams, setTeams] = useState<Team[]>([]);
   const [complementItems, setComplementItems] = useState<ComplementItem[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
+  const [bedStatusConfigs, setBedStatusConfigs] = useState<BedStatusConfig[]>([]);
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>([]);
   
   const [activeView, setActiveView] = useState<ViewType>('DASHBOARD');
@@ -47,7 +48,9 @@ const App: React.FC = () => {
     setUsers((data.users || []).filter(Boolean));
     setTeams((data.teams || []).filter(Boolean));
     setComplementItems((data.complementItems || []).filter(Boolean));
+    setComplementItems((data.complementItems || []).filter(Boolean));
     setSteps((data.steps || []).filter(Boolean));
+    setBedStatusConfigs((data.bedStatusConfigs || []).filter(Boolean));
     setServiceOrders((data.orders || []).filter(Boolean));
     
     setLoading(false);
@@ -176,13 +179,13 @@ const App: React.FC = () => {
           {syncing && <div className="absolute top-3 md:top-4 right-4 md:right-8 z-30 flex items-center space-x-2 bg-white/80 px-3 py-1 rounded-full border border-sky-100 shadow-sm"><RefreshCw className="w-3 h-3 text-sky-500 animate-spin" /></div>}
           
           <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-slate-200 min-h-full p-4 md:p-6">
-            {activeView === 'DASHBOARD' && <Dashboard beds={beds} orders={serviceOrders} users={users} services={services} />}
-            {activeView === 'DASHBOARD_OPERACIONAL' && <DashboardOperacional beds={beds} orders={serviceOrders} services={services} steps={steps} />}
+            {activeView === 'DASHBOARD' && <Dashboard beds={beds} orders={serviceOrders} users={users} services={services} bedStatusConfigs={bedStatusConfigs} />}
+            {activeView === 'DASHBOARD_OPERACIONAL' && <DashboardOperacional beds={beds} orders={serviceOrders} services={services} steps={steps} bedStatusConfigs={bedStatusConfigs} />}
             {activeView === 'SOLICITAR' && <ServiceRequestForm beds={beds} services={services} actions={actions} currentUser={currentUser} steps={steps} onSuccess={async () => { await loadAllData(); setActiveView('DASHBOARD'); }} />}
-            {activeView === 'ORDENS' && canAccessKanban && <ServiceOrdersKanban orders={serviceOrders} services={services} actions={actions} beds={beds} currentUser={currentUser} teams={teams} users={users} onUpdateOrder={handleUpdateOrder} onCompleteOrder={() => loadAllData()} />}
+            {activeView === 'ORDENS' && canAccessKanban && <ServiceOrdersKanban orders={serviceOrders} services={services} actions={actions} beds={beds} currentUser={currentUser} teams={teams} users={users} bedStatusConfigs={bedStatusConfigs} onUpdateOrder={handleUpdateOrder} onCompleteOrder={() => loadAllData()} />}
             {activeView === 'CADASTROS' && currentUser.permissions.isAdmin && (
               <RegistrationManager 
-                currentUser={currentUser} companies={companies} units={units} sectors={sectors} beds={beds} services={services} actions={actions} users={users} teams={teams} complementItems={complementItems} steps={steps}
+                currentUser={currentUser} companies={companies} units={units} sectors={sectors} beds={beds} services={services} actions={actions} users={users} teams={teams} complementItems={complementItems} steps={steps} bedStatusConfigs={bedStatusConfigs}
                 onSave={handleSaveRegistry} onDelete={handleDeleteRegistry}
               />
             )}

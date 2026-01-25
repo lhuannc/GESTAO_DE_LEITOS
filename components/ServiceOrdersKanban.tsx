@@ -211,7 +211,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
 
   const handleConfirmComplete = async () => {
     if (!editingOrder) return;
-    const updated = await db.updateOrderStatus(editingOrder.id, 'CONCLUIDO', currentUser.id, 'Etapa finalizada após conferência final de itens.');
+    const updated = await db.updateOrderStatus(editingOrder.id, 'CONCLUIDO', currentUser.id, 'Ação finalizada após conferência final de itens.');
     if (updated) {
       onUpdateOrder(updated);
       setEditingOrder(null);
@@ -319,14 +319,14 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                 )}
 
                 <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Custo da Etapa</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Custo da Ação</p>
                   <div className="flex items-end gap-2">
                     <span className="text-2xl font-black text-emerald-400">R$ {calculateItemsTotal(editingOrder).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
 
                 <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">SLA da Etapa</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">SLA da Ação</p>
                   <div className="flex items-end gap-2">
                     <span className="text-xl font-black text-white">{formatDuration(getDurations(editingOrder).totalTime)}</span>
                     <TimerIcon size={16} className="text-sky-400 mb-1 animate-pulse" />
@@ -511,7 +511,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                              )}
                              {editingOrder.status === 'EM_ANDAMENTO' && (
                                 <button onClick={handleRequestComplete} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center space-x-2 shadow-lg transition-all active:scale-95">
-                                  <CheckCircle size={18} /> <span>Finalizar Etapa</span>
+                                  <CheckCircle size={18} /> <span>Finalizar Ação</span>
                                 </button>
                              )}
                           </>

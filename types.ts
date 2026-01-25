@@ -1,5 +1,7 @@
 
-export type BedStatus = 'DISPONIVEL' | 'OCUPADO' | 'HIGIENIZACAO' | 'MANUTENCAO' | 'AGUARDANDO_ALTA';
+
+// BedStatus is now dynamic, defined at the end of file
+
 
 export interface Company {
   id: string;
@@ -59,6 +61,10 @@ export interface SubOrderConfig {
   initialStatus?: OSStatus;
   targetTeamId?: string;
   allowedItemIds?: string[];
+  bedStatusConfig?: {
+    onStart?: BedStatus;
+    onFinish?: BedStatus;
+  };
 }
 
 export interface ServiceType {
@@ -126,6 +132,18 @@ export interface ServiceOrder {
     timestamp: string;
     note?: string;
   }[];
+  dependsOnOrderId?: string | null;
 }
 
 export type ViewType = 'DASHBOARD' | 'DASHBOARD_OPERACIONAL' | 'SOLICITAR' | 'ORDENS' | 'CADASTROS';
+
+export interface BedStatusConfig {
+  id: string;
+  name: string;
+  color: string; // Classe Tailwind ou Hex
+  companyId: string;
+  isDefault?: boolean;
+}
+
+// Redefine BedStatus to be dynamic (string) but compatible with keys
+export type BedStatus = string;

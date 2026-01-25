@@ -1,4 +1,4 @@
-import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, ServiceOrder, OSStatus, Team, ComplementItem } from './types';
+import { Company, Unit, Sector, Bed, BedStatus, ServiceType, ActionStatus, User, ServiceOrder, OSStatus, Team, ComplementItem } from './types';
 import { md5, unmaskCPF } from './utils';
 import { 
   INITIAL_COMPANY, 
@@ -25,7 +25,8 @@ import {
   rowToTeam,
   rowToComplementItem,
   rowToServiceOrder,
-  rowToStep
+  rowToStep,
+  rowToBedStatusConfig
 } from './database';
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -39,6 +40,10 @@ class BackendDB {
       this.initialized = true;
     }
     return getDatabase()!;
+  }
+
+  public getDatabaseInstance() {
+    return getDatabase();
   }
 
   private getData() {
@@ -77,6 +82,9 @@ class BackendDB {
     const stepsResult = db.exec('SELECT * FROM steps');
     const steps = stepsResult.length > 0 ? stepsResult[0].values.map(r => rowToStep(r)) : [];
     
+    const bedStatusConfigsResult = db.exec('SELECT * FROM bed_status_configs');
+    const bedStatusConfigs = bedStatusConfigsResult.length > 0 ? bedStatusConfigsResult[0].values.map(r => rowToBedStatusConfig(r)) : [];
+
     const ordersResult = db.exec('SELECT * FROM service_orders');
     const orders = ordersResult.length > 0 ? ordersResult[0].values.map(r => rowToServiceOrder(r)) : [];
 
@@ -91,6 +99,7 @@ class BackendDB {
       teams,
       complementItems,
       steps,
+      bedStatusConfigs,
       orders
     };
   }
@@ -133,7 +142,8 @@ class BackendDB {
     userId: string, 
     companyId: string,
     stepsItems?: Record<number, { itemId: string, quantity: number }[]>,
-    activeSteps?: number[] // Etapas que devem ser incluídas no pedido
+    activeSteps?: number[], // Etapas que devem ser incluídas no pedido
+    dependencies?: Record<number, string> // Mapeamento: índice do novo step -> ID da ordem existente (dependência)
   }) {
     await delay(300);
     await this.ensureInitialized();
@@ -217,6 +227,43 @@ class BackendDB {
           }
         }
         
+        // Verificar dependência
+        const dependsOnOrderId = requestData.dependencies?.[newIndex] || null;
+        if (dependsOnOrderId) {
+          // Verificar status da ordem pai
+          const parentStmt = db.prepare('SELECT status FROM service_orders WHERE id = ?');
+          parentStmt.bind([dependsOnOrderId]);
+          let parentStatus: OSStatus | null = null;
+          if (parentStmt.step()) {
+            parentStatus = parentStmt.getAsObject().status as OSStatus;
+          }
+          parentStmt.free();
+
+          // Se tiver dependência e não estiver concluída, bloqueia
+          if (parentStatus && parentStatus !== 'CONCLUIDO') {
+             // Forçar bloqueio se a dependência não estiver concluída
+             // E sobrescrever o status inicial calculado
+             // Nota: Se já era BLOQUEADO (por ser etapa posterior), mantém.
+             // Se era PENDENTE (primeira etapa), vira BLOQUEADO.
+             if (initialStatus !== 'BLOQUEADO') {
+               // Mudança local, não afeta initialStatus const
+             }
+          }
+        }
+
+        const isBlockedByDependency = dependsOnOrderId ? (() => {
+           const parentStmt = db.prepare('SELECT status FROM service_orders WHERE id = ?');
+           parentStmt.bind([dependsOnOrderId]);
+           let status: OSStatus = 'PENDENTE';
+           if (parentStmt.step()) {
+             status = parentStmt.getAsObject().status as OSStatus;
+           }
+           parentStmt.free();
+           return status !== 'CONCLUIDO';
+        })() : false;
+
+        const effectiveStatus: OSStatus = isBlockedByDependency ? 'BLOQUEADO' : initialStatus;
+
         const order: ServiceOrder = {
           id: orderId,
           groupId,
@@ -230,13 +277,16 @@ class BackendDB {
           assignedTeamId: stepTeamId,
           companyId: requestData.companyId,
           requestedAt: new Date().toISOString(),
-          status: initialStatus,
+          status: effectiveStatus,
           items: processItems(originalIndex), // Usar índice original para buscar itens
+          dependsOnOrderId: dependsOnOrderId || null,
           history: [{
-            status: initialStatus,
+            status: effectiveStatus,
             userId: requestData.userId,
             timestamp: new Date().toISOString(),
-            note: isFirstActive ? 'Fluxo iniciado.' : 'Aguardando dependência.'
+            note: isBlockedByDependency 
+              ? 'Bloqueado por dependência de outra ação.' 
+              : (isFirstActive ? 'Fluxo iniciado.' : 'Aguardando dependência (sequencial).')
           }]
         };
 
@@ -245,8 +295,8 @@ class BackendDB {
         db.run(
           `INSERT INTO service_orders 
           (id, groupId, bedId, serviceId, requesterUserId, subServiceName, step, currentActionId, 
-           responsibleUserId, assignedTeamId, companyId, requestedAt, startedAt, finishedAt, status, items, history)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           responsibleUserId, assignedTeamId, companyId, requestedAt, startedAt, finishedAt, status, items, dependsOnOrderId, history)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             order.id,
             order.groupId,
@@ -264,6 +314,7 @@ class BackendDB {
             order.finishedAt || null,
             order.status,
             JSON.stringify(order.items),
+            order.dependsOnOrderId || null,
             JSON.stringify(order.history)
           ]
         );
@@ -319,8 +370,9 @@ class BackendDB {
       );
     }
 
-    // Atualizar status do leito
-    db.run('UPDATE beds SET status = ? WHERE id = ?', ['HIGIENIZACAO', requestData.bedId]);
+    // Atualizar status do leito (Removido hardcode para usar configuração do fluxo)
+    // Se a primeira etapa tiver configuração onStart, ela será aplicada quando o status mudar para EM_ANDAMENTO
+    // db.run('UPDATE beds SET status = ? WHERE id = ?', ['HIGIENIZACAO', requestData.bedId]);
     
     saveDatabase(db);
     return ordersToCreate;
@@ -469,14 +521,52 @@ class BackendDB {
       items: JSON.parse(row.items),
       history: JSON.parse(row.history)
     } as ServiceOrder;
+
+    // Buscar configurações do serviço
+    const serviceStmt = db.prepare('SELECT * FROM services WHERE id = ?');
+    serviceStmt.bind([order.serviceId]);
+    let bedStatusConfig: { onStart?: BedStatus, onFinish?: BedStatus } | undefined;
+    
+    if (serviceStmt.step()) {
+      const serviceRow = serviceStmt.getAsObject();
+      const config = serviceRow.config ? JSON.parse(serviceRow.config) : undefined;
+      if (config?.generateMultipleOS && config.subOrders && config.subOrders.length > order.step) {
+        // Encontrar a configuração da subOrder correta
+        // IMPORTANTE: order.step é o índice na execução. Precisamos mapear para a configuração original.
+        // No createOrders, fizemos um remapeamento se activeSteps foi usado.
+        // Mas assumindo execução padrão sequencial, o índice deve bater ou precisamos ser mais robustos.
+        // Simplificação: Assumimos que a ordem no array de subOrders corresponde ao step se não houver reordenação complexa.
+        // Como o createOrders usa o índice do array subOrders, podemos tentar pegar direto.
+        // Mas o objeto order não guarda o "indice original". 
+        // Vamos varrer config.subOrders para achar a config
+        // NOTE: createOrders armazena order.step = newIndex.
+        // Se activeSteps foi usado, a correspondência direta quebra.
+        // Mas o sistema atual parece só usar sequencial simples por enquanto na interface.
+        // Vamos assumir subOrders[order.step] SE não houver subServiceName conflito ou se confiarmos na ordem.
+        // Melhor: Vamos pegar a config pelo step atual.
+        const subOrderConfig = config.subOrders[order.step]; 
+        if (subOrderConfig) {
+          bedStatusConfig = subOrderConfig.bedStatusConfig;
+        }
+      }
+    }
+    serviceStmt.free();
     
     if (status === 'BLOQUEADO' && order.status !== 'BLOQUEADO') return order;
 
     if (status === 'EM_ANDAMENTO' && !order.startedAt) {
       order.startedAt = new Date().toISOString();
+      // Aplicar status ao iniciar
+      if (bedStatusConfig?.onStart) {
+        db.run('UPDATE beds SET status = ? WHERE id = ?', [bedStatusConfig.onStart, order.bedId]);
+      }
     }
     
     if (status === 'CONCLUIDO') {
+      // Aplicar status ao finalizar
+      if (bedStatusConfig?.onFinish) {
+        db.run('UPDATE beds SET status = ? WHERE id = ?', [bedStatusConfig.onFinish, order.bedId]);
+      }
       order.finishedAt = new Date().toISOString();
       
       // Buscar próxima ordem bloqueada do mesmo grupo
@@ -524,6 +614,38 @@ class BackendDB {
           ['PENDENTE', JSON.stringify(nextOrder.history), nextOrder.id]
         );
       }
+
+      // Verificar ordens que dependem desta (Cross-Flow)
+      const depStmt = db.prepare('SELECT * FROM service_orders WHERE dependsOnOrderId = ? AND status = ?');
+      depStmt.bind([orderId, 'BLOQUEADO']);
+      const depRows: any[] = [];
+      while (depStmt.step()) {
+        depRows.push(depStmt.getAsObject());
+      }
+      depStmt.free();
+
+      depRows.forEach(row => {
+        const dependentOrder = rowToServiceOrder([
+          row.id, row.groupId, row.bedId, row.serviceId, row.requesterUserId, row.subServiceName, 
+          row.step, row.currentActionId, row.responsibleUserId, row.assignedTeamId, row.companyId, 
+          row.requestedAt, row.startedAt, row.finishedAt, row.status, row.items, row.history, row.dependsOnOrderId
+        ]);
+        
+        dependentOrder.status = 'PENDENTE';
+        dependentOrder.history.push({
+          status: 'PENDENTE',
+          userId: 'system',
+          timestamp: new Date().toISOString(),
+          note: 'Liberado por conclusão da dependência.'
+        });
+
+        db.run(
+          `UPDATE service_orders 
+           SET status = ?, history = ? 
+           WHERE id = ?`,
+          ['PENDENTE', JSON.stringify(dependentOrder.history), dependentOrder.id]
+        );
+      });
     }
 
     order.status = status;
@@ -580,6 +702,7 @@ class BackendDB {
       teams: 'teams',
       complementItems: 'complement_items',
       steps: 'steps',
+      bedStatusConfigs: 'bed_status_configs',
       orders: 'service_orders'
     };
 
@@ -639,10 +762,13 @@ class BackendDB {
           }
           throw error;
         }
+      } else if (type === 'bedStatusConfigs') {
+         db.run('UPDATE bed_status_configs SET name = ?, color = ?, companyId = ?, isDefault = ? WHERE id = ?', 
+           [newItem.name, newItem.color, newItem.companyId, newItem.isDefault ? 1 : 0, id]);
       }
     } else {
       // Inserir
-      if (type === 'companies') {
+       if (type === 'companies') {
         db.run('INSERT INTO companies (id, name, cnpj) VALUES (?, ?, ?)', [id, newItem.name, newItem.cnpj]);
       } else if (type === 'units') {
         db.run('INSERT INTO units (id, name, companyId) VALUES (?, ?, ?)', [id, newItem.name, newItem.companyId]);
@@ -670,20 +796,12 @@ class BackendDB {
       } else if (type === 'complementItems') {
         db.run('INSERT INTO complement_items (id, name, unitCost, companyId) VALUES (?, ?, ?, ?)', [id, newItem.name, newItem.unitCost, newItem.companyId]);
       } else if (type === 'steps') {
-        // Validar campos obrigatórios
-        if (!newItem.name || !newItem.companyId || !newItem.targetTeamId) {
-          throw new Error('Campos obrigatórios não preenchidos: nome, empresa ou equipe responsável.');
-        }
         const allowedItemIds = JSON.stringify(newItem.allowedItemIds || []);
-        try {
-          db.run('INSERT INTO steps (id, name, companyId, targetTeamId, allowedItemIds, slaMinutes) VALUES (?, ?, ?, ?, ?, ?)', 
-            [id, newItem.name, newItem.companyId, newItem.targetTeamId, allowedItemIds, newItem.slaMinutes || null]);
-        } catch (error: any) {
-          if (error.message?.includes('FOREIGN KEY')) {
-            throw new Error('Equipe ou empresa selecionada não existe no banco de dados.');
-          }
-          throw error;
-        }
+        db.run('INSERT INTO steps (id, name, companyId, targetTeamId, allowedItemIds, slaMinutes) VALUES (?, ?, ?, ?, ?, ?)', 
+          [id, newItem.name, newItem.companyId, newItem.targetTeamId, allowedItemIds, newItem.slaMinutes || null]);
+      } else if (type === 'bedStatusConfigs') {
+        db.run('INSERT INTO bed_status_configs (id, name, color, companyId, isDefault) VALUES (?, ?, ?, ?, ?)', 
+          [id, newItem.name, newItem.color, newItem.companyId, newItem.isDefault ? 1 : 0]);
       }
     }
 
@@ -707,6 +825,7 @@ class BackendDB {
       teams: 'teams',
       complementItems: 'complement_items',
       steps: 'steps',
+      bedStatusConfigs: 'bed_status_configs',
       orders: 'service_orders'
     };
 

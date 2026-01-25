@@ -1,4 +1,4 @@
-import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, ServiceOrder, Team, ComplementItem, OSStatus, BedStatus } from './types';
+import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, ServiceOrder, Team, ComplementItem, OSStatus, BedStatus, BedStatusConfig } from './types';
 import { 
   INITIAL_COMPANY, 
   MOCK_USERS, 
@@ -9,7 +9,8 @@ import {
   INITIAL_ACTIONS,
   INITIAL_TEAMS,
   INITIAL_COMPLEMENT_ITEMS,
-  INITIAL_STEPS
+  INITIAL_STEPS,
+  INITIAL_BED_STATUS_CONFIGS
 } from './constants';
 
 // Tipo para Database do sql.js
@@ -172,6 +173,16 @@ function migrateDatabase(db: Database): void {
       }
     }
     
+    // Adicionar colunas dependsOnOrderId se não existir
+    try {
+      db.run('ALTER TABLE service_orders ADD COLUMN dependsOnOrderId TEXT');
+      needsMigration = true;
+    } catch (error: any) {
+      if (error && !error.message?.includes('duplicate column')) {
+        console.log('Erro ao adicionar coluna dependsOnOrderId:', error);
+      }
+    }
+    
     // Verificar se a tabela está vazia e fazer seed se necessário
     const checkStmt = db.prepare('SELECT COUNT(*) as count FROM steps');
     checkStmt.step();
@@ -200,6 +211,42 @@ function migrateDatabase(db: Database): void {
     console.log('Erro ao criar/migrar tabela steps:', error);
   }
   
+  // Migrar tabela bed_status_configs
+  try {
+    db.run(`
+      CREATE TABLE IF NOT EXISTS bed_status_configs (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL,
+        companyId TEXT NOT NULL,
+        isDefault INTEGER,
+        FOREIGN KEY (companyId) REFERENCES companies(id)
+      )
+    `);
+    
+    // Verificar se está vazia
+    const checkStmt = db.prepare('SELECT COUNT(*) as count FROM bed_status_configs');
+    checkStmt.step();
+    const result = checkStmt.getAsObject() as { count: number };
+    checkStmt.free();
+    
+    if (result.count === 0) {
+      INITIAL_BED_STATUS_CONFIGS.forEach(config => {
+        try {
+          db.run(
+            `INSERT INTO bed_status_configs (id, name, color, companyId, isDefault) VALUES (?, ?, ?, ?, ?)`,
+            [config.id, config.name, config.color, config.companyId, config.isDefault ? 1 : 0]
+          );
+        } catch (error: any) {
+           console.log('Erro ao inserir status padrão:', error);
+        }
+      });
+      needsMigration = true;
+    }
+  } catch (error) {
+    console.log('Erro ao migrar bed_status_configs:', error);
+  }
+
   // Se a migração foi executada, atualizar admin e salvar
   if (needsMigration) {
     try {
@@ -366,11 +413,24 @@ function createTables(db: Database): void {
       status TEXT NOT NULL,
       items TEXT NOT NULL,
       history TEXT NOT NULL,
+      dependsOnOrderId TEXT,
       FOREIGN KEY (bedId) REFERENCES beds(id),
       FOREIGN KEY (serviceId) REFERENCES services(id),
       FOREIGN KEY (requesterUserId) REFERENCES users(id),
       FOREIGN KEY (responsibleUserId) REFERENCES users(id),
       FOREIGN KEY (assignedTeamId) REFERENCES teams(id),
+      FOREIGN KEY (companyId) REFERENCES companies(id)
+    )
+  `);
+
+  // Tabela de configurações de status de leito
+  db.run(`
+    CREATE TABLE IF NOT EXISTS bed_status_configs (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL,
+      companyId TEXT NOT NULL,
+      isDefault INTEGER,
       FOREIGN KEY (companyId) REFERENCES companies(id)
     )
   `);
@@ -470,6 +530,14 @@ function seedInitialData(db: Database) {
     );
   });
 
+  // Inserir configurações de status de leito
+  INITIAL_BED_STATUS_CONFIGS.forEach(config => {
+    db.run(
+      `INSERT INTO bed_status_configs (id, name, color, companyId, isDefault) VALUES (?, ?, ?, ?, ?)`,
+      [config.id, config.name, config.color, config.companyId, config.isDefault ? 1 : 0]
+    );
+  });
+
   saveDatabase(db);
 }
 
@@ -558,6 +626,16 @@ export function rowToComplementItem(row: any[]): ComplementItem {
   };
 }
 
+export function rowToBedStatusConfig(row: any[]): BedStatusConfig {
+  return {
+    id: row[0] as string,
+    name: row[1] as string,
+    color: row[2] as string,
+    companyId: row[3] as string,
+    isDefault: !!row[4]
+  };
+}
+
 export function rowToStep(row: any[]): any {
   return {
     id: row[0] as string,
@@ -587,7 +665,8 @@ export function rowToServiceOrder(row: any[]): ServiceOrder {
     finishedAt: row[13] as string || undefined,
     status: row[14] as OSStatus,
     items: JSON.parse(row[15] as string),
-    history: JSON.parse(row[16] as string)
+    history: JSON.parse(row[16] as string),
+    dependsOnOrderId: row[17] as string || null
   };
 }
 

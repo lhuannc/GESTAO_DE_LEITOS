@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend, LineChart, Line 
 } from 'recharts';
-import { Bed, ServiceOrder, User, BedStatus, OSStatus, ServiceType } from '../types';
+import { Bed, ServiceOrder, User, BedStatus, OSStatus, ServiceType, BedStatusConfig } from '../types';
 import { Hash, Bed as BedIcon, Settings, Layers, Clock, CheckCircle2, Circle, PlayCircle, Lock, TrendingUp, Calendar, X, Eye } from 'lucide-react';
 
 interface DashboardProps {
@@ -12,6 +12,7 @@ interface DashboardProps {
   orders: ServiceOrder[];
   users: User[];
   services: ServiceType[];
+  bedStatusConfigs?: BedStatusConfig[];
 }
 
 // Função auxiliar para formatar tempo em minutos para string legível
@@ -33,7 +34,36 @@ const calculateDuration = (start: string | undefined, end: string | undefined): 
   return (endDate.getTime() - startDate.getTime()) / (1000 * 60); // em minutos
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) => {
+const OS_COLORS = {
+  BLOQUEADO: '#94a3b8',
+  PENDENTE: '#fbbf24',
+  EM_ANDAMENTO: '#38bdf8',
+  CONCLUIDO: '#34d399'
+};
+
+const getHexFromTailwind = (className: string) => {
+   if (className.includes('emerald')) return '#10b981';
+   if (className.includes('rose')) return '#f43f5e';
+   if (className.includes('amber')) return '#f59e0b';
+   if (className.includes('slate')) return '#64748b';
+   if (className.includes('sky')) return '#0ea5e9';
+   if (className.includes('blue')) return '#3b82f6';
+   if (className.includes('indigo')) return '#6366f1';
+   if (className.includes('violet')) return '#8b5cf6';
+   if (className.includes('purple')) return '#a855f7';
+   if (className.includes('fuchsia')) return '#d946ef';
+   if (className.includes('pink')) return '#ec4899';
+   if (className.includes('red')) return '#ef4444';
+   if (className.includes('orange')) return '#f97316';
+   if (className.includes('yellow')) return '#eab308';
+   if (className.includes('lime')) return '#84cc16';
+   if (className.includes('green')) return '#22c55e';
+   if (className.includes('teal')) return '#14b8a6';
+   if (className.includes('cyan')) return '#06b6d4';
+   return '#64748b';
+};
+
+const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, bedStatusConfigs = [] }) => {
   const [modalEtapasAberto, setModalEtapasAberto] = useState(false);
   const [modalFluxosAberto, setModalFluxosAberto] = useState(false);
 
@@ -343,18 +373,32 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
   }, [orders]);
 
   const bedStats = useMemo(() => {
-    const counts: Record<BedStatus, number> = {
-      DISPONIVEL: 0,
-      OCUPADO: 0,
-      HIGIENIZACAO: 0,
-      MANUTENCAO: 0,
-      AGUARDANDO_ALTA: 0
-    };
+    const counts: Record<string, number> = {};
+    
+    // Inicializar contadores com topos os status configurados ou encontrados
+    bedStatusConfigs.forEach(config => {
+      counts[config.id] = 0;
+    });
+
     beds.forEach(bed => {
+      if (!counts[bed.status]) counts[bed.status] = 0;
       counts[bed.status]++;
     });
-    return Object.entries(counts).map(([name, value]) => ({ name, value }));
-  }, [beds]);
+    
+    return Object.entries(counts).map(([id, value]) => {
+      const config = bedStatusConfigs.find(c => c.id === id);
+      return { 
+        name: config?.name || id, 
+        value,
+        color: config?.color || 'bg-slate-500', // Classe Tailwind
+        // Para Recharts precisamos de Hex. Vamos tentar mapear ou assumir que color pode ser Hex se configurado no futuro, mas o sistema usa classes.
+        // Recharts precisa de 'fill'. Se 'color' é classe, não ajuda.
+        // Solução: Mapear classes conhecidas para Hex ou usar uma prop separada.
+            // Mapa rápido de cores Tailwind padrão que estamos usando
+        fill: getHexFromTailwind(config?.color || 'bg-slate-500')
+      };
+    });
+  }, [beds, bedStatusConfigs]);
 
   // Agrupa ordens por groupId para mostrar o progresso do fluxo
   const orderGroups = useMemo(() => {
@@ -368,18 +412,8 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
       .map(group => group.sort((a, b) => a.step - b.step))
       .sort((a, b) => new Date(b[0].requestedAt).getTime() - new Date(a[0].requestedAt).getTime());
   }, [orders]);
+  
 
-  const COLORS = {
-    DISPONIVEL: '#10b981',
-    OCUPADO: '#f43f5e',
-    HIGIENIZACAO: '#f59e0b',
-    MANUTENCAO: '#64748b',
-    AGUARDANDO_ALTA: '#0ea5e9',
-    BLOQUEADO: '#94a3b8',
-    PENDENTE: '#fbbf24',
-    EM_ANDAMENTO: '#38bdf8',
-    CONCLUIDO: '#34d399'
-  };
 
   const getStatusIcon = (status: OSStatus) => {
     switch (status) {
@@ -417,7 +451,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
       {/* Quadro com quantidade de etapas por status e tempo médio */}
       <div className="bg-white border border-slate-200 rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-sm">
         <h4 className="text-[10px] font-black text-slate-800 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
-          <TrendingUp size={14} className="text-sky-500" /> Etapas por Status
+          <TrendingUp size={14} className="text-sky-500" /> Ações por Status
         </h4>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
           {etapasPorStatus.map((stat) => (
@@ -426,7 +460,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
                 <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
                   {stat.status.replace('_', ' ')}
                 </p>
-                <div className={`w-2 h-2 rounded-full`} style={{ backgroundColor: COLORS[stat.status] }} />
+                <div className={`w-2 h-2 rounded-full`} style={{ backgroundColor: OS_COLORS[stat.status] }} />
               </div>
               <div className="space-y-2">
                 <div>
@@ -461,7 +495,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
         <div className="bg-white border border-slate-200 rounded-2xl md:rounded-3xl p-4 md:p-6 shadow-sm overflow-hidden">
           <div className="flex justify-between items-center mb-6">
             <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
-              <Clock size={14} className="text-sky-500" /> Tempo Médio por Etapa
+              <Clock size={14} className="text-sky-500" /> Tempo Médio por Ação
             </h4>
             {tempoMedioPorEtapa.length > 5 && (
               <button
@@ -478,7 +512,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
               <table className="w-full text-left">
                 <thead className="bg-slate-50">
                   <tr className="text-[8px] md:text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                    <th className="px-3 py-2 text-left">Etapa</th>
+                    <th className="px-3 py-2 text-left">Ação</th>
                     <th className="px-3 py-2 text-center">Bloqueado</th>
                     <th className="px-3 py-2 text-center">Pendente</th>
                     <th className="px-3 py-2 text-center">Em Andamento</th>
@@ -520,7 +554,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
               </table>
             ) : (
               <p className="text-[9px] md:text-[10px] text-slate-400 text-center py-8">
-                Nenhuma etapa com dados ainda
+                Nenhuma ação com dados ainda
               </p>
             )}
           </div>
@@ -563,7 +597,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
                         <div>
                           <p className="text-[10px] md:text-xs font-black text-slate-800">{fluxo.nome}</p>
                           <p className="text-[8px] md:text-[9px] text-slate-500">
-                            {fluxo.quantidadeEtapas} etapas • {new Date(fluxo.dataFim || fluxo.dataInicio).toLocaleDateString()}
+                            {fluxo.quantidadeEtapas} ações • {new Date(fluxo.dataFim || fluxo.dataInicio).toLocaleDateString()}
                           </p>
                         </div>
                       </td>
@@ -582,6 +616,69 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
               </p>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Status dos Leitos */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="lg:col-span-1 bg-white p-4 md:p-6 border border-slate-200 rounded-2xl md:rounded-3xl shadow-sm flex flex-col">
+          <h4 className="text-[10px] font-black text-slate-800 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
+            <BedIcon size={14} className="text-sky-500" /> Status dos Leitos
+          </h4>
+          <div className="h-64 w-full relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={bedStats}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {bedStats.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#ffffff', 
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 'bold'
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+               <div className="text-center">
+                 <span className="text-3xl font-black text-slate-800 block">{beds.length}</span>
+                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Leitos</span>
+               </div>
+             </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 bg-white p-4 md:p-6 border border-slate-200 rounded-2xl md:rounded-3xl shadow-sm">
+           <h4 className="text-[10px] font-black text-slate-800 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
+             <Hash size={14} className="text-sky-500" /> Detalhes por Status
+           </h4>
+           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {bedStatusConfigs.filter(cfg => bedStats.some(s => s.name === cfg.name)).map(config => {
+                  const stat = bedStats.find(s => s.name === config.name);
+                  return (
+                    <div key={config.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-between group hover:border-sky-100 transition-colors">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-3 h-3 rounded-full ${config.color} ring-2 ring-white shadow-sm`}></div>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-sky-600 transition-colors">{config.name}</span>
+                      </div>
+                      <span className="font-black text-lg text-slate-800">{stat?.value || 0}</span>
+                    </div>
+                  );
+                })}
+           </div>
         </div>
       </div>
 
@@ -716,7 +813,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
                   <th className="px-4 md:px-8 py-3 md:py-4"># Número</th>
                   <th className="px-4 md:px-8 py-3 md:py-4">Leito</th>
                   <th className="px-4 md:px-8 py-3 md:py-4">Serviço</th>
-                  <th className="px-4 md:px-8 py-3 md:py-4">Etapas do Fluxo</th>
+                  <th className="px-4 md:px-8 py-3 md:py-4">Fluxo de Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -734,7 +831,10 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
                       </td>
                       <td className="px-4 md:px-8 py-4 md:py-6">
                         <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${BED_STATUS_COLORS[bed?.status || 'DISPONIVEL']}`} />
+                          {(() => {
+                             const config = bedStatusConfigs?.find(c => c.id === bed?.status);
+                             return <div className={`w-2 h-2 rounded-full ${config?.color || 'bg-slate-400'}`} />;
+                          })()}
                           <span className="text-[10px] md:text-xs font-black text-slate-700 uppercase">{bed?.name || 'N/A'}</span>
                         </div>
                       </td>
@@ -760,7 +860,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
                                 title={`${order.subServiceName}: ${order.status}`}
                               >
                                 {getStatusIcon(order.status)}
-                                <span className="max-w-[60px] md:max-w-[80px] truncate">{order.subServiceName || `Etapa ${idx + 1}`}</span>
+                                <span className="max-w-[60px] md:max-w-[80px] truncate">{order.subServiceName || `Ação ${idx + 1}`}</span>
                               </div>
                               {idx < group.length - 1 && (
                                 <div className="w-2 h-0.5 bg-slate-100 mx-0.5 shrink-0" />
@@ -802,7 +902,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
           <div className="bg-white rounded-2xl md:rounded-3xl shadow-xl w-full max-w-6xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
             <div className="flex justify-between items-center p-4 md:p-6 border-b border-slate-200">
               <h3 className="text-[12px] md:text-sm font-black text-slate-800 uppercase tracking-[0.2em] flex items-center gap-2">
-                <Clock size={16} className="text-sky-500" /> Tempo Médio por Etapa - Todas as Etapas
+                <Clock size={16} className="text-sky-500" /> Tempo Médio por Ação - Todas as Ações
               </h3>
               <button
                 onClick={() => setModalEtapasAberto(false)}
@@ -817,7 +917,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
                 <table className="w-full text-left">
                   <thead className="bg-slate-50 sticky top-0 z-10">
                     <tr className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <th className="px-3 md:px-4 py-2 md:py-3 text-left">Etapa</th>
+                      <th className="px-3 md:px-4 py-2 md:py-3 text-left">Ação</th>
                       <th className="px-3 md:px-4 py-2 md:py-3 text-center">Bloqueado</th>
                       <th className="px-3 md:px-4 py-2 md:py-3 text-center">Pendente</th>
                       <th className="px-3 md:px-4 py-2 md:py-3 text-center">Em Andamento</th>
@@ -895,7 +995,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services }) 
                           <div>
                             <p className="text-[11px] md:text-sm font-black text-slate-800">{fluxo.nome}</p>
                             <p className="text-[9px] md:text-[10px] text-slate-500">
-                              {fluxo.quantidadeEtapas} etapas • {new Date(fluxo.dataFim || fluxo.dataInicio).toLocaleDateString()}
+                              {fluxo.quantidadeEtapas} ações • {new Date(fluxo.dataFim || fluxo.dataInicio).toLocaleDateString()}
                             </p>
                           </div>
                         </td>
