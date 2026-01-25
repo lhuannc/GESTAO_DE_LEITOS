@@ -24,13 +24,21 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [complementItems, setComplementItems] = useState<ComplementItem[]>([]);
-  const [showCosts, setShowCosts] = useState(false);
+
 
   // Estrutura: { stepIndex: { itemId: quantity } }
   const [selectedItemsPerStep, setSelectedItemsPerStep] = useState<Record<number, Record<string, number>>>({});
 
-  // Dependências entre fluxos: { stepIndex: orderId }
-  const [dependencies, setDependencies] = useState<Record<number, string>>({});
+  // Dependências entre fluxos: { stepIndex: { bedId, flowId, actionId, type } }
+  const [dependencies, setDependencies] = useState<Record<number, {
+    bedId: string;
+    flowId: string; // groupId
+    actionId: string;
+    type: 'BLOQUEADA' | 'BLOQUEADOR';
+  }>>({});
+
+  // Controla se a seção de dependência está visível por etapa
+  const [showDependency, setShowDependency] = useState<Record<number, boolean>>({});
   
   // Ordens ativas para o leito selecionado (para seleção de dependência)
   const [activeOrders, setActiveOrders] = useState<ServiceOrder[]>([]);
@@ -58,7 +66,8 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
            step: row.step,
            status: row.status as any,
            serviceId: row.serviceId,
-           bedId: row.bedId // Importante para agrupar/filtrar no UI
+           bedId: row.bedId, // Importante para agrupar/filtrar no UI
+           groupId: row.groupId // CRÍTICO: Faltava isso para o filtro de fluxo funcionar
          } as any);
       }
       stmt.free();
@@ -77,31 +86,45 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
       // Limpar seleções de itens ao trocar de serviço
       setSelectedItemsPerStep({});
       setDependencies({});
+      setShowDependency({});
     }
   }, [selectedServiceId]);
 
   // Alternar etapa ativa/inativa
   const toggleStep = (stepIdx: number) => {
-    setActiveSteps(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(stepIdx)) {
+    const isCurrentlyActive = activeSteps.has(stepIdx);
+    
+    if (isCurrentlyActive) {
+      // Remover
+      setActiveSteps(prev => {
+        const newSet = new Set(prev);
         newSet.delete(stepIdx);
-        // Remover itens e dependências da etapa desativada
-        setSelectedItemsPerStep(prevItems => {
-          const newItems = { ...prevItems };
-          delete newItems[stepIdx];
-          return newItems;
-        });
-        setDependencies(prev => {
-          const newDeps = { ...prev };
-          delete newDeps[stepIdx];
-          return newDeps;
-        });
-      } else {
+        return newSet;
+      });
+      // Limpar estados relacionados
+      setSelectedItemsPerStep(prev => {
+        const newItems = { ...prev };
+        delete newItems[stepIdx];
+        return newItems;
+      });
+      setDependencies(prev => {
+        const newDeps = { ...prev };
+        delete newDeps[stepIdx];
+        return newDeps;
+      });
+      setShowDependency(prev => {
+        const next = { ...prev };
+        delete next[stepIdx];
+        return next;
+      });
+    } else {
+      // Adicionar
+      setActiveSteps(prev => {
+        const newSet = new Set(prev);
         newSet.add(stepIdx);
-      }
-      return newSet;
-    });
+        return newSet;
+      });
+    }
   };
 
   // Atualizar quantidade de item (limitado a 1 por etapa)
@@ -185,12 +208,21 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
         userId: currentUser.id,
         companyId: currentUser.companyId,
         stepsItems,
-        activeSteps: Array.from(activeSteps), // Passar etapas ativas para o backend
-        dependencies // Passar dependências
+        activeSteps: Array.from(activeSteps),
+        dependencies: Object.entries(dependencies).reduce((acc, [stepIdx, dep]) => {
+          const typedDep = dep as { actionId: string, type: 'BLOQUEADA' | 'BLOQUEADOR' };
+          return {
+            ...acc,
+            [stepIdx]: { 
+              targetOrderId: typedDep.actionId, 
+              type: typedDep.type 
+            }
+          };
+        }, {})
       });
       onSuccess();
     } catch (error) {
-      alert("Erro ao criar solicitação.");
+      alert(`Erro ao criar solicitação: ${(error as any).message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -211,14 +243,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
           </div>
         </div>
         
-        <button 
-          type="button"
-          onClick={() => setShowCosts(!showCosts)}
-          className="flex items-center space-x-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-full text-[10px] font-black uppercase transition-all"
-        >
-          {showCosts ? <EyeOff size={14} /> : <Eye size={14} />}
-          <span>{showCosts ? 'Ocultar Valores' : 'Exibir Valores'}</span>
-        </button>
+
       </div>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
@@ -285,6 +310,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                  )}
                </div>
                
+               {/* Seção de Insumos */}
                {(selectedService.config?.subOrders || [{ name: 'Atendimento Geral', allowedItemIds: [] }]).map((sub, idx) => {
                   // Buscar dados da etapa se stepId estiver presente
                   const step = sub.stepId ? steps.find(s => s.id === sub.stepId) : null;
@@ -323,41 +349,156 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                        </div>
 
                         {isActive && activeOrders.length > 0 && (
-                          <div className="mb-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
-                            <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block mb-1 flex items-center gap-1">
-                              <Layers size={12} /> Associar a Ação Existente (Dependência)
-                            </label>
-                            <select
-                              value={dependencies[idx] || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setDependencies(prev => val ? ({ ...prev, [idx]: val }) : (() => {
-                                  const next = { ...prev };
-                                  delete next[idx];
-                                  return next;
-                                })());
-                              }}
-                              className="w-full text-xs p-2 bg-white border border-indigo-200 rounded-lg outline-none text-slate-600 focus:ring-2 focus:ring-indigo-200"
-                            >
-                              <option value="">Nenhuma (Iniciar imediatamente)</option>
-                              {activeOrders
-                                .filter(o => o.serviceId !== selectedServiceId) // Evitar circularidade simples no mesmo serviço (opcional)
-                                .map(o => {
-                                  const bedName = beds.find(b => b.id === o.bedId)?.name || 'Leito desconhecido';
-                                  return (
-                                    <option key={o.id} value={o.id}>
-                                      {bedName} - {o.subServiceName} ({o.status})
-                                    </option>
-                                  );
-                                })}
-                            </select>
-                            {dependencies[idx] && (
-                               <p className="text-[9px] text-indigo-400 mt-1 font-bold">
-                                 * Esta ação ficará BLOQUEADA até a conclusão da ação selecionada.
-                               </p>
+                          <div className={`mb-4 p-4 border rounded-xl transition-all ${showDependency[idx] ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-slate-200'}`}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <input 
+                                type="checkbox"
+                                id={`dep-check-${idx}`}
+                                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                checked={!!showDependency[idx]}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  setShowDependency(prev => ({ ...prev, [idx]: checked }));
+                                  if (!checked) {
+                                    setDependencies(prev => {
+                                      const next = { ...prev };
+                                      delete next[idx];
+                                      return next;
+                                    });
+                                  }
+                                }}
+                              />
+                              <label htmlFor={`dep-check-${idx}`} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1 cursor-pointer select-none">
+                                <Layers size={12} /> Associar Dependência (Opcional)
+                              </label>
+                            </div>
+                            
+                            {showDependency[idx] && (
+                              <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                {/* Hierarquia de Seleção */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {/* 1. Selecionar Leito */}
+                                <div>
+                                    <label className="text-[9px] font-bold text-slate-500 uppercase">1. Leito</label>
+                                    <select
+                                        className="w-full text-xs p-2 bg-white border border-indigo-200 rounded-lg outline-none text-slate-600"
+                                        value={dependencies[idx]?.bedId || ''}
+                                        onChange={(e) => {
+                                            const bedId = e.target.value;
+                                            setDependencies(prev => {
+                                                if (!bedId) {
+                                                    const next = { ...prev };
+                                                    delete next[idx];
+                                                    return next;
+                                                }
+                                                return { 
+                                                    ...prev, 
+                                                    [idx]: { 
+                                                        bedId, 
+                                                        flowId: '', 
+                                                        actionId: '', 
+                                                        type: 'BLOQUEADA' 
+                                                    } 
+                                                };
+                                            });
+                                        }}
+                                    >
+                                        <option value="">Selecione o Leito...</option>
+                                        {Array.from(new Set(activeOrders.map(o => o.bedId))).map(bedId => {
+                                            const bedName = beds.find(b => b.id === bedId)?.name || 'Desconhecido';
+                                            return <option key={bedId} value={bedId}>{bedName}</option>;
+                                        })}
+                                    </select>
+                                </div>
+
+                                {/* 2. Selecionar Fluxo (Group) */}
+                                <div>
+                                    <label className="text-[9px] font-bold text-slate-500 uppercase">2. Fluxo</label>
+                                    <select
+                                        className="w-full text-xs p-2 bg-white border border-indigo-200 rounded-lg outline-none text-slate-600"
+                                        disabled={!dependencies[idx]?.bedId}
+                                        value={dependencies[idx]?.flowId || ''}
+                                        onChange={(e) => {
+                                            const flowId = e.target.value;
+                                            setDependencies(prev => ({ 
+                                                ...prev, 
+                                                [idx]: { ...prev[idx], flowId, actionId: '' } 
+                                            }));
+                                        }}
+                                    >
+                                        <option value="">Selecione o Fluxo...</option>
+                                        {dependencies[idx]?.bedId && Array.from(new Set(
+                                            activeOrders
+                                                .filter(o => o.bedId === dependencies[idx].bedId)
+                                                .map(o => o.groupId)
+                                        )).map(groupId => {
+                                            const groupOrders = activeOrders.filter(o => o.groupId === groupId);
+                                            const serviceName = services.find(s => s.id === groupOrders[0].serviceId)?.name || 'Fluxo';
+                                            const time = new Date(groupOrders[0].requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                            return <option key={groupId} value={groupId}>{serviceName} ({time})</option>;
+                                        })}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* 3. Selecionar Ação e Tipo */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[9px] font-bold text-slate-500 uppercase">3. Ação Alvo</label>
+                                    <select
+                                        className="w-full text-xs p-2 bg-white border border-indigo-200 rounded-lg outline-none text-slate-600"
+                                        disabled={!dependencies[idx]?.flowId}
+                                        value={dependencies[idx]?.actionId || ''}
+                                        onChange={(e) => {
+                                            const actionId = e.target.value;
+                                            setDependencies(prev => ({ 
+                                                ...prev, 
+                                                [idx]: { ...prev[idx], actionId } 
+                                            }));
+                                        }}
+                                    >
+                                        <option value="">Selecione a Ação...</option>
+                                        {dependencies[idx]?.flowId && activeOrders
+                                            .filter(o => o.groupId === dependencies[idx].flowId)
+                                            .sort((a,b) => a.step - b.step)
+                                            .map(o => (
+                                                <option key={o.id} value={o.id}>{o.subServiceName} ({o.status})</option>
+                                            ))
+                                        }
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[9px] font-bold text-slate-500 uppercase">4. Tipo de Associação</label>
+                                    <select
+                                        className="w-full text-xs p-2 bg-white border border-indigo-200 rounded-lg outline-none text-slate-600"
+                                        disabled={!dependencies[idx]?.actionId}
+                                        value={dependencies[idx]?.type || 'BLOQUEADA'}
+                                        onChange={(e) => {
+                                            setDependencies(prev => ({ 
+                                                ...prev, 
+                                                [idx]: { ...prev[idx], type: e.target.value as any } 
+                                            }));
+                                        }}
+                                    >
+                                        <option value="BLOQUEADA">Bloqueada por (Espera)</option>
+                                        <option value="BLOQUEADOR">Bloqueia (Interrompe)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            {dependencies[idx]?.actionId && (
+                               <div className={`text-[9px] font-bold mt-1 p-2 rounded ${dependencies[idx].type === 'BLOQUEADA' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'}`}>
+                                 {dependencies[idx].type === 'BLOQUEADA' 
+                                    ? `* Esta nova ação ficará BLOQUEADA aguardando a conclusão da ação selecionada.`
+                                    : `* A ação selecionada será BLOQUEADA por esta nova ação.`
+                                 }
+                               </div>
                             )}
                           </div>
                         )}
+                      </div>
+                    )}
 
                        {isActive ? (
                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:gap-3">
@@ -369,7 +510,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                                   <div key={item.id} className={`p-3 md:p-4 rounded-lg md:rounded-xl border transition-all flex items-center justify-between ${qty > 0 ? 'bg-white border-sky-300 shadow-md ring-2 ring-sky-200' : hasOtherItem ? 'bg-slate-100/50 border-slate-200 opacity-50' : 'bg-white/50 border-slate-100 hover:border-slate-300'}`}>
                                      <div className="flex-1 pr-2">
                                         <p className={`text-[11px] font-black uppercase leading-tight ${qty > 0 ? 'text-slate-700' : hasOtherItem ? 'text-slate-400' : 'text-slate-700'}`}>{item.name}</p>
-                                        {showCosts && <p className="text-[10px] text-emerald-600 font-bold mt-1">R$ {item.unitCost.toFixed(2)}</p>}
+
                                         {qty > 0 && (
                                           <p className="text-[9px] text-sky-600 font-black mt-1">✓ Selecionado</p>
                                         )}
@@ -461,14 +602,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
                  )}
               </div>
 
-              {showCosts && totalCost > 0 && (
-                <div className="pt-6 border-t border-sky-900 flex justify-between items-end mb-10">
-                   <span className="text-[10px] text-sky-400 font-black uppercase tracking-widest">Custo Estimado</span>
-                   <div className="text-right">
-                      <p className="text-2xl font-black text-white">R$ {totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                   </div>
-                </div>
-              )}
+
 
               <button
                 type="submit"

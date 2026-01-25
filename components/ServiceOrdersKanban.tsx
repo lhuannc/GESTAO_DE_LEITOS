@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ServiceOrder, ServiceType, ActionStatus, Bed, User, OSStatus, Team } from '../types';
+import { ServiceOrder, ServiceType, ActionStatus, Bed, User, OSStatus, Team, Sector, BedStatusConfig } from '../types';
 import { 
   ChevronRight, 
   User as UserIcon, 
@@ -37,9 +37,11 @@ interface ServiceOrdersKanbanProps {
   services: ServiceType[];
   actions: ActionStatus[];
   beds: Bed[];
+  sectors: Sector[];
   currentUser: User;
   teams: Team[];
   users: User[];
+  bedStatusConfigs: BedStatusConfig[];
   onUpdateOrder: (order: ServiceOrder) => void;
   onCompleteOrder: (orderId: string, bedId: string) => void;
 }
@@ -67,6 +69,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   orders, 
   services, 
   beds,
+  sectors,
   currentUser,
   teams,
   users,
@@ -109,9 +112,25 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
     return currentUserTeams.includes(order.assignedTeamId);
   };
 
-  const getBlockerOrder = (order: ServiceOrder) => {
-    if (order.status !== 'BLOQUEADO' || order.step === 0) return null;
-    return orders.find(o => o.groupId === order.groupId && o.step === order.step - 1);
+  // Retorna LISTA de bloqueadores (pode ser sequencial ou explícito)
+  const getBlockerOrders = (order: ServiceOrder): ServiceOrder[] => {
+    if (order.status !== 'BLOQUEADO') return [];
+    
+    // Se tiver dependências explícitas
+    if (order.dependsOnOrderIds && order.dependsOnOrderIds.length > 0) {
+      return orders.filter(o => 
+        order.dependsOnOrderIds?.includes(o.id) && 
+        o.status !== 'CONCLUIDO'
+      );
+    }
+    
+    // Fallback: Sequencial (mesmo grupo, etapa anterior)
+    if (order.step > 0) {
+      const prev = orders.find(o => o.groupId === order.groupId && o.step === order.step - 1);
+      return prev ? [prev] : [];
+    }
+
+    return [];
   };
 
   const handleRequestAssign = () => {
@@ -245,7 +264,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
 
   const allItemsConfirmed = editingOrder ? confirmedItemIds.length === (editingOrder.items || []).length : false;
   const requesterName = editingOrder ? users.find(u => u.id === editingOrder.requesterUserId)?.name : 'N/A';
-  const blocker = editingOrder ? getBlockerOrder(editingOrder) : null;
+  const blockerOrders = editingOrder ? getBlockerOrders(editingOrder) : [];
 
   return (
     <div className="relative">
@@ -270,9 +289,13 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                     order={order} 
                     currentUser={currentUser}
                     team={teams.find(t => t.id === order.assignedTeamId)}
-                    bed={beds.find(b => b.id === order.bedId)} 
+                    bed={beds.find(b => b.id === order.bedId)}
+                    sector={(() => {
+                      const bed = beds.find(b => b.id === order.bedId);
+                      return bed ? sectors.find(s => s.id === bed.sectorId) : undefined;
+                    })()}
                     responsibleName={users.find(u => u.id === order.responsibleUserId)?.name}
-                    blockerStepName={getBlockerOrder(order)?.subServiceName}
+                    blockerStepName={getBlockerOrders(order)[0]?.subServiceName}
                     onClick={() => {
                       setEditingOrder(order);
                       setIsConfirmingItems(false);
@@ -298,7 +321,12 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
               </div>
               
               <h4 className="text-2xl font-black mb-1 leading-tight">{editingOrder.subServiceName || services.find(s => s.id === editingOrder.serviceId)?.name}</h4>
-              <p className="text-sky-400 font-bold text-sm mb-6 flex items-center gap-2"><MapPin size={14}/> {beds.find(b => b.id === editingOrder.bedId)?.name}</p>
+              <p className="text-sky-400 font-bold text-sm flex items-center gap-2"><MapPin size={14}/> {beds.find(b => b.id === editingOrder.bedId)?.name}</p>
+              <p className="text-sky-300/60 font-bold text-xs mb-6 ml-5">{(() => {
+                const bed = beds.find(b => b.id === editingOrder.bedId);
+                const sector = bed ? sectors.find(s => s.id === bed.sectorId) : null;
+                return sector?.name || '';
+              })()}</p>
 
               <div className="space-y-6 flex-1">
                 <div className="pt-4 border-t border-slate-800">
@@ -309,21 +337,32 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                   </p>
                 </div>
 
-                {blocker && (
+                {blockerOrders.length > 0 && (
                    <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl">
-                      <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                      <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 flex items-center gap-2">
                         <Lock size={12} /> Status: Bloqueado
                       </p>
-                      <p className="text-[10px] font-bold text-white">Aguardando a conclusão de: <span className="text-rose-300 uppercase">{blocker.subServiceName}</span></p>
+                      <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-white mb-1">Aguardando a conclusão de:</p>
+                        {blockerOrders.map(b => {
+                           const bBed = beds.find(bed => bed.id === b.bedId);
+                           const bSector = bBed ? sectors.find(s => s.id === bBed.sectorId) : null;
+                           const bActionName = b.subServiceName;
+                           
+                           return (
+                             <div key={b.id} className="text-[11px] text-rose-300 font-bold bg-rose-500/10 p-2 rounded border border-rose-500/20">
+                               <span className="uppercase">{bActionName}</span>
+                               <span className="block text-[9px] text-rose-400/80 mt-0.5">
+                                 {bBed?.name || 'Leito N/A'} / {bSector?.name || 'Setor N/A'}
+                               </span>
+                             </div>
+                           );
+                        })}
+                      </div>
                    </div>
                 )}
 
-                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Custo da Ação</p>
-                  <div className="flex items-end gap-2">
-                    <span className="text-2xl font-black text-emerald-400">R$ {calculateItemsTotal(editingOrder).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                </div>
+
 
                 <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">SLA da Ação</p>
@@ -415,8 +454,6 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                                <tr>
                                   <th className="px-6 py-4">Insumo</th>
                                   <th className="px-6 py-4 text-center">Quantidade</th>
-                                  <th className="px-6 py-4 text-right">Valor Unit.</th>
-                                  <th className="px-6 py-4 text-right">Subtotal</th>
                                </tr>
                             </thead>
                             <tbody className="text-xs">
@@ -424,12 +461,10 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                                  <tr key={idx} className="border-t border-slate-100 hover:bg-white transition-colors">
                                     <td className="px-6 py-4 font-bold text-slate-700 uppercase text-[10px]">{it.name}</td>
                                     <td className="px-6 py-4 text-center font-black text-slate-500">{it.quantity}</td>
-                                    <td className="px-6 py-4 text-right text-slate-400 font-medium">R$ {it.unitCost.toFixed(2)}</td>
-                                    <td className="px-6 py-4 text-right font-black text-slate-800">R$ {(it.unitCost * it.quantity).toFixed(2)}</td>
                                  </tr>
                                ))}
                                {(!editingOrder.items || editingOrder.items.length === 0) && (
-                                 <tr><td colSpan={4} className="px-6 py-8 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">Nenhum item associado à OS</td></tr>
+                                 <tr><td colSpan={2} className="px-6 py-8 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">Nenhum item associado à OS</td></tr>
                                )}
                             </tbody>
                           </table>
@@ -642,7 +677,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   );
 };
 
-const KanbanCard: React.FC<{ order: ServiceOrder; bed: Bed | undefined; team: Team | undefined; responsibleName?: string; currentUser: User; blockerStepName?: string; onClick: () => void }> = ({ order, bed, team, responsibleName, currentUser, blockerStepName, onClick }) => {
+const KanbanCard: React.FC<{ order: ServiceOrder; bed: Bed | undefined; sector: Sector | undefined; team: Team | undefined; responsibleName?: string; currentUser: User; blockerStepName?: string; onClick: () => void }> = ({ order, bed, sector, team, responsibleName, currentUser, blockerStepName, onClick }) => {
   const [totalTime, setTotalTime] = useState('');
   useEffect(() => {
     const update = () => {
@@ -670,7 +705,10 @@ const KanbanCard: React.FC<{ order: ServiceOrder; bed: Bed | undefined; team: Te
       )}
       
       <div className="flex justify-between items-start mb-2 mt-2">
-        <h5 className="text-lg font-black text-slate-800 leading-none truncate pr-2">{bed?.name}</h5>
+        <div className="overflow-hidden pr-2">
+          <h5 className="text-lg font-black text-slate-800 leading-none truncate">{bed?.name}</h5>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate mt-0.5">{sector?.name}</p>
+        </div>
         <div className={`w-2 h-2 rounded-full shrink-0 ${order.status === 'BLOQUEADO' ? 'bg-slate-300' : order.status === 'EM_ANDAMENTO' ? 'bg-sky-500 animate-pulse' : order.status === 'CONCLUIDO' ? 'bg-emerald-500' : 'bg-amber-400'}`} />
       </div>
       
@@ -685,11 +723,7 @@ const KanbanCard: React.FC<{ order: ServiceOrder; bed: Bed | undefined; team: Te
         )}
 
         <div className="flex flex-wrap gap-2">
-          {itemsCost > 0 && (
-            <div className="flex items-center space-x-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg w-fit">
-              <Receipt size={10} /> <span>R$ {itemsCost.toFixed(2)}</span>
-            </div>
-          )}
+
         </div>
       </div>
 

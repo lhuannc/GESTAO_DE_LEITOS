@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
-  LayoutDashboard, ClipboardPlus, Settings, Kanban, LogOut, Menu, X, Loader2, RefreshCw, ChevronDown, ChevronRight, TrendingUp
+  LayoutDashboard, ClipboardPlus, Settings, Kanban, LogOut, Menu, X, Loader2, RefreshCw, ChevronDown, ChevronRight, TrendingUp, Search
 } from 'lucide-react';
 import { 
   Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, ServiceOrder, ViewType, Team, ComplementItem, Step, BedStatusConfig
@@ -10,6 +10,7 @@ import Dashboard from './components/Dashboard';
 import DashboardOperacional from './components/DashboardOperacional';
 import ServiceRequestForm from './components/ServiceRequestForm';
 import ServiceOrdersKanban from './components/ServiceOrdersKanban';
+import ActionsList from './components/ActionsList';
 import RegistrationManager from './components/RegistrationManager';
 import Login from './components/Login';
 import { db } from './backend';
@@ -148,6 +149,8 @@ const App: React.FC = () => {
             <SidebarItem icon={<Kanban size={20} />} label="Ordens" active={activeView === 'ORDENS'} collapsed={!isSidebarOpen} onClick={() => setActiveView('ORDENS')} />
           )}
 
+          <SidebarItem icon={<Search size={20} />} label="Pesquisa de Ações" active={activeView === 'PESQUISA_ACOES'} collapsed={!isSidebarOpen} onClick={() => setActiveView('PESQUISA_ACOES')} />
+
           {currentUser.permissions.isAdmin && (
             <SidebarItem icon={<Settings size={20} />} label="Cadastros" active={activeView === 'CADASTROS'} collapsed={!isSidebarOpen} onClick={() => setActiveView('CADASTROS')} />
           )}
@@ -182,7 +185,8 @@ const App: React.FC = () => {
             {activeView === 'DASHBOARD' && <Dashboard beds={beds} orders={serviceOrders} users={users} services={services} bedStatusConfigs={bedStatusConfigs} />}
             {activeView === 'DASHBOARD_OPERACIONAL' && <DashboardOperacional beds={beds} orders={serviceOrders} services={services} steps={steps} bedStatusConfigs={bedStatusConfigs} />}
             {activeView === 'SOLICITAR' && <ServiceRequestForm beds={beds} services={services} actions={actions} currentUser={currentUser} steps={steps} onSuccess={async () => { await loadAllData(); setActiveView('DASHBOARD'); }} />}
-            {activeView === 'ORDENS' && canAccessKanban && <ServiceOrdersKanban orders={serviceOrders} services={services} actions={actions} beds={beds} currentUser={currentUser} teams={teams} users={users} bedStatusConfigs={bedStatusConfigs} onUpdateOrder={handleUpdateOrder} onCompleteOrder={() => loadAllData()} />}
+            {activeView === 'ORDENS' && canAccessKanban && <ServiceOrdersKanban orders={serviceOrders} services={services} actions={actions} beds={beds} sectors={sectors} currentUser={currentUser} teams={teams} users={users} bedStatusConfigs={bedStatusConfigs} onUpdateOrder={handleUpdateOrder} onCompleteOrder={() => loadAllData()} />}
+            {activeView === 'PESQUISA_ACOES' && <ActionsList orders={serviceOrders} services={services} beds={beds} sectors={sectors} users={users} steps={steps} />}
             {activeView === 'CADASTROS' && currentUser.permissions.isAdmin && (
               <RegistrationManager 
                 currentUser={currentUser} companies={companies} units={units} sectors={sectors} beds={beds} services={services} actions={actions} users={users} teams={teams} complementItems={complementItems} steps={steps} bedStatusConfigs={bedStatusConfigs}

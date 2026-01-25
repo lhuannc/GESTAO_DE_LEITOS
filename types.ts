@@ -132,10 +132,10 @@ export interface ServiceOrder {
     timestamp: string;
     note?: string;
   }[];
-  dependsOnOrderId?: string | null;
+  dependsOnOrderIds?: string[];
 }
 
-export type ViewType = 'DASHBOARD' | 'DASHBOARD_OPERACIONAL' | 'SOLICITAR' | 'ORDENS' | 'CADASTROS';
+export type ViewType = 'DASHBOARD' | 'DASHBOARD_OPERACIONAL' | 'SOLICITAR' | 'ORDENS' | 'CADASTROS' | 'PESQUISA_ACOES';
 
 export interface BedStatusConfig {
   id: string;

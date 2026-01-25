@@ -143,7 +143,7 @@ class BackendDB {
     companyId: string,
     stepsItems?: Record<number, { itemId: string, quantity: number }[]>,
     activeSteps?: number[], // Etapas que devem ser incluídas no pedido
-    dependencies?: Record<number, string> // Mapeamento: índice do novo step -> ID da ordem existente (dependência)
+    dependencies?: Record<number, { targetOrderId: string, type: 'BLOQUEADA' | 'BLOQUEADOR' }> // Dependências estruturadas
   }) {
     await delay(300);
     await this.ensureInitialized();
@@ -168,6 +168,7 @@ class BackendDB {
     };
     const groupId = `group-${Date.now()}`;
     const ordersToCreate: ServiceOrder[] = [];
+    let previousOrderId: string | null = null;
 
     const processItems = (step: number) => {
       const selections = requestData.stepsItems?.[step] || [];
@@ -188,24 +189,17 @@ class BackendDB {
     if (service.config?.generateMultipleOS && service.config.subOrders?.length) {
       // Filtrar apenas etapas ativas (se especificado)
       const activeStepsSet = requestData.activeSteps ? new Set(requestData.activeSteps) : null;
+      // Mapear preservando o índice original na configuração
       const stepsToCreate = service.config.subOrders
         .map((sub, index) => ({ sub, index }))
         .filter(({ index }) => !activeStepsSet || activeStepsSet.has(index));
 
-      // Reindexar steps para manter sequência correta
-      const stepIndexMap = new Map<number, number>();
-      stepsToCreate.forEach(({ index }, newIdx) => {
-        stepIndexMap.set(index, newIdx);
-      });
-
-      stepsToCreate.forEach(({ sub, index: originalIndex }) => {
-        const newIndex = stepIndexMap.get(originalIndex)!;
-        // Primeira etapa ativa deve ser PENDENTE, demais BLOQUEADO
+      // Iterar sobre os passos a criar
+      stepsToCreate.forEach(({ sub, index: originalIndex }, newIndex) => {
+        // Primeira etapa ativa é PENDENTE, a menos que haja bloqueio explícito
         const isFirstActive = newIndex === 0;
-        const initialStatus: OSStatus = isFirstActive ? 'PENDENTE' : 'BLOQUEADO';
-        const orderId = `so-${Date.now()}-${newIndex}`;
         
-        // Buscar dados da etapa se stepId estiver presente
+        // Buscar dados da etapa
         let stepName = sub.name || '';
         let stepTeamId = sub.targetTeamId || '';
         let stepItemIds = sub.allowedItemIds || [];
@@ -213,56 +207,43 @@ class BackendDB {
         if (sub.stepId) {
           const stepStmt = db.prepare('SELECT * FROM steps WHERE id = ?');
           stepStmt.bind([sub.stepId]);
-          const stepRows: any[] = [];
-          while (stepStmt.step()) {
-            stepRows.push(stepStmt.getAsObject());
-          }
-          stepStmt.free();
-          
-          if (stepRows.length > 0) {
-            const stepRow = stepRows[0];
+          if (stepStmt.step()) {
+            const stepRow = stepStmt.getAsObject();
             stepName = stepRow.name;
             stepTeamId = stepRow.targetTeamId;
             stepItemIds = JSON.parse(stepRow.allowedItemIds);
           }
+          stepStmt.free();
         }
         
-        // Verificar dependência
-        const dependsOnOrderId = requestData.dependencies?.[newIndex] || null;
-        if (dependsOnOrderId) {
-          // Verificar status da ordem pai
-          const parentStmt = db.prepare('SELECT status FROM service_orders WHERE id = ?');
-          parentStmt.bind([dependsOnOrderId]);
-          let parentStatus: OSStatus | null = null;
-          if (parentStmt.step()) {
-            parentStatus = parentStmt.getAsObject().status as OSStatus;
-          }
-          parentStmt.free();
-
-          // Se tiver dependência e não estiver concluída, bloqueia
-          if (parentStatus && parentStatus !== 'CONCLUIDO') {
-             // Forçar bloqueio se a dependência não estiver concluída
-             // E sobrescrever o status inicial calculado
-             // Nota: Se já era BLOQUEADO (por ser etapa posterior), mantém.
-             // Se era PENDENTE (primeira etapa), vira BLOQUEADO.
-             if (initialStatus !== 'BLOQUEADO') {
-               // Mudança local, não afeta initialStatus const
-             }
-          }
-        }
-
-        const isBlockedByDependency = dependsOnOrderId ? (() => {
+        // Verificar dependência EXPLICITA usando o índice original
+        const dependency = requestData.dependencies?.[originalIndex];
+        const explicitTargetId = dependency?.type === 'BLOQUEADA' ? dependency.targetOrderId : null;
+        
+        // Verificar status da dependência explícita (se houver)
+        let isExplicitBlocked = false;
+        if (explicitTargetId) {
            const parentStmt = db.prepare('SELECT status FROM service_orders WHERE id = ?');
-           parentStmt.bind([dependsOnOrderId]);
-           let status: OSStatus = 'PENDENTE';
+           parentStmt.bind([explicitTargetId]);
            if (parentStmt.step()) {
-             status = parentStmt.getAsObject().status as OSStatus;
+             const status = parentStmt.getAsObject().status as OSStatus;
+             isExplicitBlocked = status !== 'CONCLUIDO';
            }
            parentStmt.free();
-           return status !== 'CONCLUIDO';
-        })() : false;
+        }
 
-        const effectiveStatus: OSStatus = isBlockedByDependency ? 'BLOQUEADO' : initialStatus;
+        // Construir lista de IDs que bloqueiam esta ordem
+        const dependsOnOrderIds: string[] = [];
+        if (explicitTargetId) dependsOnOrderIds.push(explicitTargetId);
+        if (previousOrderId) dependsOnOrderIds.push(previousOrderId);
+
+        // Status inicial: BLOQUEADO se tiver qualquer dependência (sequencial ou explícita) que não esteja concluída
+        // Simplificação: Se tem previousOrderId, assume bloqueado (pois acabou de ser criado e é PENDENTE/BLOQUEADO).
+        // Se isExplicitBlocked, também bloqueado.
+        const shouldBlock = (previousOrderId !== null) || isExplicitBlocked;
+        const effectiveStatus: OSStatus = shouldBlock ? 'BLOQUEADO' : 'PENDENTE';
+
+        const orderId = `so-${Date.now()}-${newIndex}`;
 
         const order: ServiceOrder = {
           id: orderId,
@@ -279,14 +260,14 @@ class BackendDB {
           requestedAt: new Date().toISOString(),
           status: effectiveStatus,
           items: processItems(originalIndex), // Usar índice original para buscar itens
-          dependsOnOrderId: dependsOnOrderId || null,
+          dependsOnOrderIds: dependsOnOrderIds,
           history: [{
             status: effectiveStatus,
             userId: requestData.userId,
             timestamp: new Date().toISOString(),
-            note: isBlockedByDependency 
-              ? 'Bloqueado por dependência de outra ação.' 
-              : (isFirstActive ? 'Fluxo iniciado.' : 'Aguardando dependência (sequencial).')
+            note: shouldBlock 
+              ? 'Aguardando conclusão de dependências.' 
+              : 'Fluxo iniciado.'
           }]
         };
 
@@ -314,12 +295,64 @@ class BackendDB {
             order.finishedAt || null,
             order.status,
             JSON.stringify(order.items),
-            order.dependsOnOrderId || null,
+            JSON.stringify(order.dependsOnOrderIds),
             JSON.stringify(order.history)
           ]
         );
+
+        // Atualizar previousOrderId para a próxima iteração
+        previousOrderId = orderId;
+
+        // Lógica Inversa: Ordem Existente Depende de Nova Ordem (Bloqueador)
+        if (dependency && dependency.type === 'BLOQUEADOR') {
+            const targetOrderId = dependency.targetOrderId;
+            
+            // Buscar ordem alvo
+            const targetStmt = db.prepare('SELECT * FROM service_orders WHERE id = ?');
+            targetStmt.bind([targetOrderId]);
+            let targetOrder: any = null;
+            if (targetStmt.step()) {
+               targetOrder = targetStmt.getAsObject();
+            }
+            targetStmt.free();
+
+            if (targetOrder) {
+                // Parse history
+                const currentHistory = targetOrder.history ? JSON.parse(targetOrder.history) : [];
+                currentHistory.push({
+                    status: 'BLOQUEADO',
+                    userId: requestData.userId,
+                    timestamp: new Date().toISOString(),
+                    note: `Bloqueado por nova solicitação (Dependência Reversa: ${stepName})`
+                });
+
+                // Atualizar ordem alvo para ficar BLOQUEADA e depender da nova ordem
+                let currentDeps: string[] = [];
+                try {
+                   if (targetOrder.dependsOnOrderId) {
+                      const parsed = JSON.parse(targetOrder.dependsOnOrderId);
+                      if (Array.isArray(parsed)) currentDeps = parsed;
+                      else currentDeps = [targetOrder.dependsOnOrderId]; 
+                   }
+                } catch (e) {
+                   if (targetOrder.dependsOnOrderId) currentDeps = [targetOrder.dependsOnOrderId];
+                }
+                
+                if (!currentDeps.includes(orderId)) {
+                  currentDeps.push(orderId);
+                }
+
+                db.run(
+                   `UPDATE service_orders 
+                    SET status = ?, dependsOnOrderId = ?, history = ? 
+                    WHERE id = ?`,
+                   ['BLOQUEADO', JSON.stringify(currentDeps), JSON.stringify(currentHistory), targetOrderId]
+                );
+            }
+        }
       });
     } else {
+      // Single Service Order Case
       const orderId = `so-${Date.now()}`;
       const order: ServiceOrder = {
         id: orderId,
@@ -328,16 +361,19 @@ class BackendDB {
         serviceId: requestData.serviceId,
         requesterUserId: requestData.userId,
         step: 0,
+        subServiceName: service.name,
         currentActionId: '',
         responsibleUserId: null,
         companyId: requestData.companyId,
         requestedAt: new Date().toISOString(),
         status: 'PENDENTE',
         items: processItems(0),
+        dependsOnOrderIds: [],
         history: [{
           status: 'PENDENTE',
           userId: requestData.userId,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          note: 'Solicitação criada.'
         }]
       };
 
@@ -346,8 +382,8 @@ class BackendDB {
       db.run(
         `INSERT INTO service_orders 
         (id, groupId, bedId, serviceId, requesterUserId, subServiceName, step, currentActionId, 
-         responsibleUserId, assignedTeamId, companyId, requestedAt, startedAt, finishedAt, status, items, history)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         responsibleUserId, assignedTeamId, companyId, requestedAt, startedAt, finishedAt, status, items, dependsOnOrderId, history)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           order.id,
           order.groupId,
@@ -365,13 +401,13 @@ class BackendDB {
           order.finishedAt || null,
           order.status,
           JSON.stringify(order.items),
+          null, // dependsOnOrderId
           JSON.stringify(order.history)
         ]
       );
     }
 
-    // Atualizar status do leito (Removido hardcode para usar configuração do fluxo)
-    // Se a primeira etapa tiver configuração onStart, ela será aplicada quando o status mudar para EM_ANDAMENTO
+    // Atualizar status do leito (opcional, manter comentado confforme original)
     // db.run('UPDATE beds SET status = ? WHERE id = ?', ['HIGIENIZACAO', requestData.bedId]);
     
     saveDatabase(db);
@@ -569,55 +605,14 @@ class BackendDB {
       }
       order.finishedAt = new Date().toISOString();
       
-      // Buscar próxima ordem bloqueada do mesmo grupo
-      const nextStmt = db.prepare('SELECT * FROM service_orders WHERE groupId = ? AND step = ? AND status = ?');
-      nextStmt.bind([order.groupId, order.step + 1, 'BLOQUEADO']);
-      const nextOrderRows: any[] = [];
-      while (nextStmt.step()) {
-        nextOrderRows.push(nextStmt.getAsObject());
-      }
-      nextStmt.free();
-      
-      if (nextOrderRows.length > 0) {
-        const nextRow = nextOrderRows[0];
-        const nextOrder = {
-          id: nextRow.id,
-          groupId: nextRow.groupId,
-          bedId: nextRow.bedId,
-          serviceId: nextRow.serviceId,
-          requesterUserId: nextRow.requesterUserId,
-          subServiceName: nextRow.subServiceName || undefined,
-          step: nextRow.step,
-          currentActionId: nextRow.currentActionId,
-          responsibleUserId: nextRow.responsibleUserId || null,
-          assignedTeamId: nextRow.assignedTeamId || undefined,
-          companyId: nextRow.companyId,
-          requestedAt: nextRow.requestedAt,
-          startedAt: nextRow.startedAt || undefined,
-          finishedAt: nextRow.finishedAt || undefined,
-          status: nextRow.status,
-          items: JSON.parse(nextRow.items),
-          history: JSON.parse(nextRow.history)
-        } as ServiceOrder;
-        nextOrder.status = 'PENDENTE';
-        nextOrder.history.push({
-          status: 'PENDENTE',
-          userId: 'system',
-          timestamp: new Date().toISOString(),
-          note: 'Liberado automaticamente.'
-        });
+      // Lógica de desbloqueio sequencial implícito REMOVIDA.
+      // Agora usamos dependências explícitas (criadas em createOrdersFromService)
+      // para garantir que a ordem N espere pela N-1, além de quaisquer outras.
+      // Isso é tratado pelo bloco "Generic Dependency Unblock" abaixo.
 
-        db.run(
-          `UPDATE service_orders 
-           SET status = ?, history = ? 
-           WHERE id = ?`,
-          ['PENDENTE', JSON.stringify(nextOrder.history), nextOrder.id]
-        );
-      }
-
-      // Verificar ordens que dependem desta (Cross-Flow)
-      const depStmt = db.prepare('SELECT * FROM service_orders WHERE dependsOnOrderId = ? AND status = ?');
-      depStmt.bind([orderId, 'BLOQUEADO']);
+      // Verificar ordens que dependem desta (Cross-Flow & Reverse)
+      // Como o SQLite não tem array functions nativas fáceis aqui, vamos buscar todos os BLOQUEADOS e filtrar no código
+      const depStmt = db.prepare("SELECT * FROM service_orders WHERE status = 'BLOQUEADO'");
       const depRows: any[] = [];
       while (depStmt.step()) {
         depRows.push(depStmt.getAsObject());
@@ -625,26 +620,54 @@ class BackendDB {
       depStmt.free();
 
       depRows.forEach(row => {
-        const dependentOrder = rowToServiceOrder([
-          row.id, row.groupId, row.bedId, row.serviceId, row.requesterUserId, row.subServiceName, 
-          row.step, row.currentActionId, row.responsibleUserId, row.assignedTeamId, row.companyId, 
-          row.requestedAt, row.startedAt, row.finishedAt, row.status, row.items, row.history, row.dependsOnOrderId
-        ]);
-        
-        dependentOrder.status = 'PENDENTE';
-        dependentOrder.history.push({
-          status: 'PENDENTE',
-          userId: 'system',
-          timestamp: new Date().toISOString(),
-          note: 'Liberado por conclusão da dependência.'
-        });
+         let deps: string[] = [];
+         try {
+           deps = row.dependsOnOrderId ? JSON.parse(row.dependsOnOrderId) : [];
+           if (!Array.isArray(deps)) deps = [row.dependsOnOrderId]; // Handle legacy single string
+         } catch (e) {
+           deps = row.dependsOnOrderId ? [row.dependsOnOrderId] : [];
+         }
 
-        db.run(
-          `UPDATE service_orders 
-           SET status = ?, history = ? 
-           WHERE id = ?`,
-          ['PENDENTE', JSON.stringify(dependentOrder.history), dependentOrder.id]
-        );
+         if (deps.includes(orderId)) {
+            // Remover dependência
+            const newDeps = deps.filter(id => id !== orderId);
+            
+            // Se não sobrar nenhuma, desbloquear
+            if (newDeps.length === 0) {
+               const dependentOrder = rowToServiceOrder([
+                row.id, row.groupId, row.bedId, row.serviceId, row.requesterUserId, row.subServiceName, 
+                row.step, row.currentActionId, row.responsibleUserId, row.assignedTeamId, row.companyId, 
+                row.requestedAt, row.startedAt, row.finishedAt, row.status, row.items, row.history, 
+                JSON.stringify(newDeps) // Pass updated deps as "column 17" substitute for row conversion? 
+                // Wait, rowToServiceOrder expects raw row.
+                // We should just construct object manually or update rowToServiceOrder.
+                // Actually, let's just update DB directly since we know the ID.
+              ]);
+              
+              const history = JSON.parse(row.history);
+              history.push({
+                status: 'PENDENTE',
+                userId: 'system',
+                timestamp: new Date().toISOString(),
+                note: 'Liberado por conclusão de TODAS as dependências.'
+              });
+
+              db.run(
+                `UPDATE service_orders 
+                 SET status = ?, dependsOnOrderId = ?, history = ? 
+                 WHERE id = ?`,
+                ['PENDENTE', JSON.stringify(newDeps), JSON.stringify(history), row.id]
+              );
+            } else {
+               // Apenas atualizar a lista de dependências removendo a concluída
+               db.run(
+                `UPDATE service_orders 
+                 SET dependsOnOrderId = ? 
+                 WHERE id = ?`,
+                [JSON.stringify(newDeps), row.id]
+              );
+            }
+         }
       });
     }
 

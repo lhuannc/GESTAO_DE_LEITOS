@@ -117,8 +117,12 @@ async function loadDatabase(initSqlJs: any): Promise<Database> {
 // Salva o banco no localStorage
 export function saveDatabase(db: Database) {
   const data = db.export();
-  // Converter Uint8Array para base64 sem usar Buffer
-  const binary = String.fromCharCode(...data);
+  // Converter Uint8Array para base64 de forma segura (avoiding stack overflow)
+  let binary = '';
+  const len = data.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(data[i]);
+  }
   const base64 = btoa(binary);
   localStorage.setItem('gestao_leitos_sqlite_db', base64);
 }
@@ -666,7 +670,7 @@ export function rowToServiceOrder(row: any[]): ServiceOrder {
     status: row[14] as OSStatus,
     items: JSON.parse(row[15] as string),
     history: JSON.parse(row[16] as string),
-    dependsOnOrderId: row[17] as string || null
+    dependsOnOrderIds: row[17] ? JSON.parse(row[17] as string) : []
   };
 }
 
