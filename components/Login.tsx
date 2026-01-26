@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { db } from '../backend';
-import { ShieldCheck, Fingerprint, Lock, Loader2, Hospital } from 'lucide-react';
+import { ShieldCheck, Fingerprint, Lock, Loader2, Hospital, Building2 } from 'lucide-react';
 
 interface LoginProps {
   onLoginSuccess: (user: User) => void;
@@ -36,87 +36,156 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-slate-950 p-4 md:p-6 lg:p-8 relative overflow-hidden">
-      {/* Background Decor */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-sky-500/10 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
-
-      <div className="max-w-md md:max-w-lg w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="bg-slate-900/50 backdrop-blur-xl p-6 md:p-8 rounded-3xl md:rounded-[2.5rem] border border-slate-800 shadow-2xl">
-          <div className="text-center mb-8 md:mb-10">
-            <div className="inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 bg-sky-500/10 rounded-2xl md:rounded-3xl mb-4 md:mb-6 border border-sky-500/20 text-sky-500 shadow-inner">
-              <Hospital size={32} className="md:w-10 md:h-10" />
+    <div className="min-h-screen w-full flex bg-slate-50">
+      {/* Left Side - Hospital Image */}
+      <div className="hidden lg:flex lg:w-1/2 xl:w-3/5 relative overflow-hidden bg-gradient-to-br from-sky-900 via-sky-800 to-emerald-900">
+        <div className="absolute inset-0 bg-black/20 z-10" />
+        <img 
+          src="/hospital.png" 
+          alt="Hospital Municipal Ronaldo Gazolla" 
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        
+        {/* Overlay Content */}
+        <div className="relative z-20 flex flex-col justify-between p-12 text-white w-full">
+          <div>
+            <div className="flex items-center gap-3 mb-8">
+              <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/20">
+                <Building2 size={24} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-wider text-white/90">RIOSAUDE</h2>
+                <p className="text-xs text-white/70 font-medium">Sistema de Gestão Hospitalar</p>
+              </div>
             </div>
-            <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight mb-2">Gestão de Leitos</h1>
-            <p className="text-slate-400 font-medium text-xs md:text-sm">Sistema de Gestão Hospitalar</p>
+          </div>
+          
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-4xl xl:text-5xl font-black leading-tight mb-4">
+                Hospital Municipal<br />
+                Ronaldo Gazolla
+              </h1>
+              <p className="text-lg text-white/80 font-medium max-w-md">
+                Gestão inteligente de leitos e fluxos operacionais para excelência no atendimento.
+              </p>
+            </div>
+            
+            <div className="flex gap-8 pt-6 border-t border-white/20">
+              <div>
+                <p className="text-3xl font-black">24/7</p>
+                <p className="text-sm text-white/70 font-medium">Disponibilidade</p>
+              </div>
+              <div>
+                <p className="text-3xl font-black">99.9%</p>
+                <p className="text-sm text-white/70 font-medium">Uptime SLA</p>
+              </div>
+              <div>
+                <p className="text-3xl font-black">100%</p>
+                <p className="text-sm text-white/70 font-medium">Seguro</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 xl:w-2/5 flex items-center justify-center p-6 md:p-12">
+        <div className="w-full max-w-md animate-in fade-in slide-in-from-right-4 duration-500">
+          {/* Mobile Header */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-sky-500/10 rounded-2xl mb-4 border border-sky-500/20 text-sky-600">
+              <Hospital size={32} />
+            </div>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight mb-1">Gestão de Leitos</h1>
+            <p className="text-slate-500 font-medium text-sm">RIOSAUDE</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5 md:space-y-6">
-            <div className="space-y-4">
+          {/* Login Form */}
+          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-xl border border-slate-200">
+            <div className="mb-8">
+              <h2 className="text-2xl md:text-3xl font-black text-slate-800 mb-2">Bem-vindo</h2>
+              <p className="text-slate-500 font-medium text-sm">Entre com suas credenciais para acessar o sistema</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1">Login de Acesso</label>
+                <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-2">
+                  Login de Acesso
+                </label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-3 md:pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-sky-500 transition-colors">
-                    <Fingerprint size={16} className="md:w-[18px] md:h-[18px]" />
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-600 transition-colors">
+                    <Fingerprint size={18} />
                   </div>
                   <input 
                     type="text" 
                     required 
                     value={login} 
                     onChange={(e) => setLogin(e.target.value)}
-                    className="w-full pl-11 md:pl-12 pr-4 py-3 md:py-4 bg-slate-800/50 border border-slate-700 rounded-xl md:rounded-2xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none text-white text-sm font-bold transition-all placeholder:text-slate-600"
-                    placeholder="Ex: ADMIN ou seu login"
+                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none text-slate-800 text-sm font-bold transition-all placeholder:text-slate-400"
+                    placeholder="Digite seu login"
                     autoComplete="username"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 px-1">Senha Secreta</label>
+                <label className="block text-xs font-black text-slate-600 uppercase tracking-wider mb-2">
+                  Senha
+                </label>
                 <div className="relative group">
-                  <div className="absolute inset-y-0 left-0 pl-3 md:pl-4 flex items-center pointer-events-none text-slate-500 group-focus-within:text-sky-500 transition-colors">
-                    <Lock size={16} className="md:w-[18px] md:h-[18px]" />
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-sky-600 transition-colors">
+                    <Lock size={18} />
                   </div>
                   <input 
                     type="password" 
                     required 
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-11 md:pl-12 pr-4 py-3 md:py-4 bg-slate-800/50 border border-slate-700 rounded-xl md:rounded-2xl focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500 outline-none text-white text-sm font-bold transition-all placeholder:text-slate-600"
-                    placeholder="••••••••"
+                    className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none text-slate-800 text-sm font-bold transition-all placeholder:text-slate-400"
+                    placeholder="Digite sua senha"
                     autoComplete="current-password"
                   />
                 </div>
               </div>
+
+              {error && (
+                <div className="bg-rose-50 border-2 border-rose-200 p-4 rounded-xl flex items-start gap-3 animate-in fade-in zoom-in duration-200">
+                  <ShieldCheck size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                  <p className="text-xs font-bold text-rose-700 leading-relaxed">{error}</p>
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full py-4 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 disabled:text-slate-500 text-white rounded-xl font-black uppercase text-sm tracking-wider shadow-lg shadow-sky-900/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-6"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>Autenticando...</span>
+                  </>
+                ) : (
+                  'Entrar no Sistema'
+                )}
+              </button>
+            </form>
+
+            <div className="mt-8 pt-6 border-t border-slate-200 text-center">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Suporte Técnico: (21) 4004-HIGI
+              </p>
             </div>
-
-            {error && (
-              <div className="bg-rose-500/10 border border-rose-500/20 p-3 md:p-4 rounded-xl md:rounded-2xl flex items-center gap-2 md:gap-3 animate-in fade-in zoom-in duration-200">
-                <ShieldCheck size={16} className="md:w-[18px] md:h-[18px] text-rose-500 shrink-0" />
-                <p className="text-[10px] md:text-[11px] font-bold text-rose-200 leading-tight">{error}</p>
-              </div>
-            )}
-
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full py-3 md:py-4 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl md:rounded-2xl font-black uppercase text-xs tracking-[0.15em] shadow-xl shadow-sky-900/20 transition-all active:scale-95 flex items-center justify-center gap-2"
-            >
-              {loading ? <Loader2 size={16} className="md:w-[18px] md:h-[18px] animate-spin" /> : 'Entrar no Sistema'}
-            </button>
-          </form>
-
-          <div className="mt-8 md:mt-10 text-center">
-            <p className="text-[9px] md:text-[10px] font-black text-slate-600 uppercase tracking-widest">Suporte Técnico: (11) 4004-HIGI</p>
           </div>
-        </div>
-        
-        <div className="mt-6 md:mt-8 text-center flex items-center justify-center gap-3 md:gap-4 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-600">
-           <span>Privacidade</span>
-           <span className="w-1 h-1 rounded-full bg-slate-800" />
-           <span>Termos</span>
-           <span className="w-1 h-1 rounded-full bg-slate-800" />
-           <span>SLA 99.9%</span>
+
+          <div className="mt-6 text-center flex items-center justify-center gap-3 text-xs font-bold uppercase tracking-wider text-slate-400">
+            <span>Privacidade</span>
+            <span className="w-1 h-1 rounded-full bg-slate-300" />
+            <span>Termos</span>
+            <span className="w-1 h-1 rounded-full bg-slate-300" />
+            <span>Segurança</span>
+          </div>
         </div>
       </div>
     </div>
