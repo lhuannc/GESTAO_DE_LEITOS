@@ -331,11 +331,31 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-3 md:p-4">
-          <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl max-w-2xl w-full overflow-hidden animate-in zoom-in duration-200 max-h-[95vh] md:max-h-[90vh] flex flex-col">
-            <div className="p-4 md:p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
-              <h4 className="font-black text-slate-800 uppercase tracking-tight text-sm md:text-base">{isEditing ? 'Editar' : 'Novo'} {activeTab}</h4>
-              <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-400" /></button>
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-4">
+          <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl max-w-5xl w-full overflow-hidden animate-in zoom-in fade-in duration-300 max-h-[95vh] md:max-h-[90vh] flex flex-col">
+            <div className="p-5 md:p-7 border-b border-slate-200 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-sky-500/10 rounded-xl flex items-center justify-center">
+                  {activeTab === 'servico' ? <Settings size={20} className="text-sky-600" /> : 
+                   activeTab === 'leito' ? <BedIcon size={20} className="text-sky-600" /> :
+                   activeTab === 'usuario' ? <Users size={20} className="text-sky-600" /> :
+                   <Building2 size={20} className="text-sky-600" />}
+                </div>
+                <div>
+                  <h4 className="font-black text-slate-800 text-lg md:text-xl">
+                    {isEditing ? 'Editar' : 'Novo'} {activeTab === 'servico' ? 'Fluxo' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                  </h4>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {isEditing ? 'Atualize as informações abaixo' : 'Preencha os dados para cadastrar'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                <X size={22} className="text-slate-400" />
+              </button>
             </div>
             
             <form onSubmit={handleFormSubmit} className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 flex-1 overflow-y-auto scrollbar-hide">
