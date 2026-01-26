@@ -3,7 +3,7 @@ import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, BedStatus,
 
 export const INITIAL_COMPANY: Company = {
   id: 'c1',
-  name: 'Hospital Central de Diagnóstico',
+  name: 'RIOSAUDE',
   cnpj: '12.345.678/0001-99'
 };
 
@@ -67,19 +67,17 @@ export const INITIAL_TEAMS: Team[] = [
 ];
 
 export const INITIAL_UNITS: Unit[] = [
-  { id: 'un-1', name: 'Unidade de Internação', companyId: 'c1' },
-  { id: 'un-2', name: 'Pronto Atendimento', companyId: 'c1' }
+  { id: 'un-1', name: 'HOSPITAL MUNICIPAL RONALDO GAZOLLA', companyId: 'c1' }
 ];
 
 export const INITIAL_SECTORS: Sector[] = [
-  { id: 'st-1', name: 'UTI Adulto', unitId: 'un-1' },
-  { id: 'st-2', name: 'Enfermaria A', unitId: 'un-1' }
+  { id: 'st-1', name: 'POSTO ASSISTENCIAL 10', unitId: 'un-1' }
 ];
 
 export const INITIAL_BEDS: Bed[] = [
-  { id: 'bd-1', name: 'Leito 101', sectorId: 'st-1', status: 'OCUPADO' },
-  { id: 'bd-2', name: 'Leito 102', sectorId: 'st-1', status: 'AGUARDANDO_ALTA' },
-  { id: 'bd-3', name: 'Leito 201', sectorId: 'st-2', status: 'DISPONIVEL' }
+  { id: 'bd-1', name: '1001 - CTI', sectorId: 'st-1', status: 'DISPONIVEL' },
+  { id: 'bd-2', name: '1002 - CTI', sectorId: 'st-1', status: 'DISPONIVEL' },
+  { id: 'bd-3', name: '1003 - CTI', sectorId: 'st-1', status: 'DISPONIVEL' }
 ];
 
 export const INITIAL_SERVICES: ServiceType[] = [
