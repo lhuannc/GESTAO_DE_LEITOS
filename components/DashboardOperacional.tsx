@@ -1,13 +1,14 @@
 
 import React, { useMemo, useState } from 'react';
-import { Bed, ServiceOrder, ServiceType, Step, BedStatusConfig } from '../types';
-import { Layers, Clock, CheckCircle2, Circle, PlayCircle, Lock, AlertCircle, X } from 'lucide-react';
+import { Bed, ServiceOrder, ServiceType, Step, BedStatusConfig, User } from '../types';
+import { Layers, Clock, CheckCircle2, Circle, PlayCircle, Lock, AlertCircle, X, Hash, MapPin, User as UserIcon, Timer as TimerIcon, Package, Users as SilhouetteIcon } from 'lucide-react';
 
 interface DashboardOperacionalProps {
   beds: Bed[];
   orders: ServiceOrder[];
   services: ServiceType[];
   steps: Step[];
+  users: User[];
   bedStatusConfigs?: BedStatusConfig[];
 }
 
@@ -99,8 +100,9 @@ const calculateTimeFromPendingToCompletion = (order: ServiceOrder): number => {
   return (fim.getTime() - inicioPendente.getTime()) / (1000 * 60); // em minutos
 };
 
-const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, orders, services, steps, bedStatusConfigs = [] }) => {
+const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, orders, services, steps, users, bedStatusConfigs = [] }) => {
   const [selectedBed, setSelectedBed] = useState<{ bed: Bed; orders: ServiceOrder[] } | null>(null);
+  const [selectedAction, setSelectedAction] = useState<ServiceOrder | null>(null);
   
   // Agrupar ordens por groupId e leito
   const leitosComFluxos = useMemo(() => {
@@ -360,14 +362,15 @@ const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, order
                             return (
                               <div key={order.id} className="flex items-center">
                                 <div 
-                                  className={`flex flex-col gap-0.5 px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg border-2 transition-all relative ${
-                                    foraDoPrazo ? 'bg-rose-50 border-rose-300 ring-2 ring-rose-200' :
-                                    order.status === 'CONCLUIDO' ? 'bg-emerald-50 border-emerald-200' :
-                                    order.status === 'EM_ANDAMENTO' ? 'bg-sky-50 border-sky-200 ring-2 ring-sky-100' :
-                                    order.status === 'PENDENTE' ? 'bg-amber-50 border-amber-200' :
-                                    'bg-slate-50 border-slate-200 opacity-60'
+                                  className={`flex flex-col gap-0.5 px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg border-2 transition-all relative cursor-pointer hover:scale-105 ${
+                                    foraDoPrazo ? 'bg-rose-50 border-rose-300 ring-2 ring-rose-200 hover:bg-rose-100' :
+                                    order.status === 'CONCLUIDO' ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100' :
+                                    order.status === 'EM_ANDAMENTO' ? 'bg-sky-50 border-sky-200 ring-2 ring-sky-100 hover:bg-sky-100' :
+                                    order.status === 'PENDENTE' ? 'bg-amber-50 border-amber-200 hover:bg-amber-100' :
+                                    'bg-slate-50 border-slate-200 opacity-60 hover:opacity-80'
                                   }`}
                                   title={`${order.subServiceName}: ${order.status}${foraDoPrazo ? ' - FORA DO PRAZO' : ''}`}
+                                  onClick={() => setSelectedAction(order)}
                                 >
                                   <div className="flex items-center gap-1 md:gap-1.5">
                                     {foraDoPrazo && <AlertCircle size={12} className="text-rose-600 shrink-0" />}
@@ -519,6 +522,193 @@ const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, order
         </div>
       </div>
     )}
+
+    {/* Action Details Modal (Read-Only) */}
+    {selectedAction && (() => {
+      const service = services.find(s => s.id === selectedAction.serviceId);
+      const bed = beds.find(b => b.id === selectedAction.bedId);
+      const sector = bed ? null : null; // sectors not passed to this component
+      
+      return (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-50 p-2 md:p-4">
+          <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl max-w-5xl w-full overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col lg:flex-row h-[95vh] md:h-[90vh] lg:h-auto">
+            
+            {/* Sidebar */}
+            <div className="bg-slate-900 lg:w-80 text-white p-4 md:p-6 lg:p-8 flex flex-col shrink-0 overflow-y-auto">
+              <div className="flex justify-between items-start mb-6">
+                <span className="bg-sky-500 text-[10px] font-black uppercase px-2 py-0.5 rounded flex items-center gap-1">
+                  <Hash size={10} /> {selectedAction.id.slice(-6)}
+                </span>
+              </div>
+              
+              <h4 className="text-2xl font-black mb-1 leading-tight">{selectedAction.subServiceName || service?.name || 'Ação'}</h4>
+              <p className="text-sky-400 font-bold text-sm flex items-center gap-2 mb-6"><MapPin size={14}/> {bed?.name || '-'}</p>
+
+              <div className="space-y-6 flex-1">
+                <div className="pt-4 border-t border-slate-800">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Status da Ação</p>
+                  <span className={`inline-block px-3 py-1 rounded-lg text-xs font-black uppercase ${
+                    selectedAction.status === 'CONCLUIDO' ? 'bg-emerald-500 text-white' :
+                    selectedAction.status === 'EM_ANDAMENTO' ? 'bg-sky-500 text-white' :
+                    selectedAction.status === 'PENDENTE' ? 'bg-amber-500 text-white' :
+                    'bg-slate-500 text-white'
+                  }`}>
+                    {selectedAction.status.replace('_', ' ')}
+                  </span>
+                </div>
+
+                <div className="bg-slate-800 p-4 rounded-2xl border border-slate-700">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tempo Decorrido</p>
+                  <div className="flex items-end gap-2">
+                    <span className="text-xl font-black text-white">{formatDuration(calculateTimeFromPendingToCompletion(selectedAction))}</span>
+                    <TimerIcon size={16} className="text-sky-400 mb-1 animate-pulse" />
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-slate-800">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Executor Responsável</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center font-black text-sky-400 text-sm shrink-0 border border-slate-600">
+                      {selectedAction.responsibleUserId ? users.find(u => u.id === selectedAction.responsibleUserId)?.name.charAt(0) : <SilhouetteIcon size={20} className="text-slate-500" />}
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Atribuído a:</p>
+                      <p className="text-xs font-bold truncate text-white">
+                        {selectedAction.responsibleUserId ? users.find(u => u.id === selectedAction.responsibleUserId)?.name : 'Ninguém atribuído'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-slate-800">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Serviço/Fluxo</p>
+                  <p className="text-xs font-bold text-slate-100">
+                    {service?.name || '-'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div className="flex-1 p-4 md:p-6 lg:p-8 bg-white flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto pr-2 md:pr-4 scrollbar-hide mb-4 md:mb-6 space-y-6">
+                <div>
+                  <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Informações da Ação</h5>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Data de Solicitação</p>
+                      <p className="text-sm text-slate-700">
+                        {new Date(selectedAction.requestedAt).toLocaleString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                    {selectedAction.finishedAt && (
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Data de Conclusão</p>
+                        <p className="text-sm text-slate-700">
+                          {new Date(selectedAction.finishedAt).toLocaleString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Checklist de Insumos */}
+                <div>
+                  <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center space-x-2">
+                    <Package size={16} className="text-sky-500" /> <span>Checklist de Insumos</span>
+                  </h5>
+                  <div className="bg-slate-50/50 rounded-2xl border border-slate-100 overflow-hidden">
+                    <table className="w-full text-left">
+                      <thead className="bg-slate-100 text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                        <tr>
+                          <th className="px-6 py-4">Insumo</th>
+                          <th className="px-6 py-4 text-center">Quantidade</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-xs">
+                        {(selectedAction.items || []).map((it, idx) => (
+                          <tr key={idx} className="border-t border-slate-100 hover:bg-white transition-colors">
+                            <td className="px-6 py-4 font-bold text-slate-700 uppercase text-[10px]">{it.name}</td>
+                            <td className="px-6 py-4 text-center font-black text-slate-500">{it.quantity}</td>
+                          </tr>
+                        ))}
+                        {(!selectedAction.items || selectedAction.items.length === 0) && (
+                          <tr><td colSpan={2} className="px-6 py-8 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">Nenhum item associado à OS</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Rastreabilidade de Execução */}
+                {selectedAction.history && selectedAction.history.length > 0 && (
+                  <div>
+                    <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center space-x-2">
+                      <Clock size={16} className="text-sky-500" /> <span>Rastreabilidade de Execução</span>
+                    </h5>
+                    <div className="space-y-1">
+                      {selectedAction.history
+                        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+                        .map((h, i, arr) => {
+                          const prevTime = i === 0 ? new Date(selectedAction.requestedAt).getTime() : new Date(arr[i-1].timestamp).getTime();
+                          const diff = new Date(h.timestamp).getTime() - prevTime;
+                          const isTooFast = diff < 60000 && diff > 0 && h.status === 'CONCLUIDO';
+                          
+                          return (
+                            <div key={i} className="relative pl-8 pb-4 border-l-2 border-slate-100 ml-2">
+                              <div className={`absolute left-[-9px] top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 ${
+                                h.status === 'CONCLUIDO' ? 'bg-emerald-500' : 
+                                h.status === 'EM_ANDAMENTO' ? 'bg-sky-500' : 'bg-amber-500'
+                              }`} />
+                              <div className="flex flex-col">
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider">{h.status.replace('_', ' ')}</span>
+                                  <div className="flex items-center gap-2">
+                                    {i > 0 && (
+                                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm ${isTooFast ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>
+                                        {isTooFast && <TimerIcon size={10} className="animate-pulse" />}
+                                        +{formatDuration(diff / 60000)}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-bold text-slate-400">{new Date(h.timestamp).toLocaleTimeString()}</span>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-slate-500 font-medium">{h.note || 'Evento de sistema'}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-slate-200 pt-4 flex justify-end gap-3">
+                <button
+                  onClick={() => setSelectedAction(null)}
+                  className="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-black rounded-xl transition-all text-sm uppercase tracking-wide"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
     </>
   );
 };

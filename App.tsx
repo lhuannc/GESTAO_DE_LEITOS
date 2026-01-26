@@ -183,7 +183,7 @@ const App: React.FC = () => {
           
           <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-slate-200 min-h-full p-4 md:p-6">
             {activeView === 'DASHBOARD' && <Dashboard beds={beds} orders={serviceOrders} users={users} services={services} bedStatusConfigs={bedStatusConfigs} />}
-            {activeView === 'DASHBOARD_OPERACIONAL' && <DashboardOperacional beds={beds} orders={serviceOrders} services={services} steps={steps} bedStatusConfigs={bedStatusConfigs} />}
+            {activeView === 'DASHBOARD_OPERACIONAL' && <DashboardOperacional beds={beds} orders={serviceOrders} services={services} steps={steps} users={users} bedStatusConfigs={bedStatusConfigs} />}
             {activeView === 'SOLICITAR' && <ServiceRequestForm beds={beds} services={services} actions={actions} currentUser={currentUser} steps={steps} onSuccess={async () => { await loadAllData(); setActiveView('DASHBOARD'); }} />}
             {activeView === 'ORDENS' && canAccessKanban && <ServiceOrdersKanban orders={serviceOrders} services={services} actions={actions} beds={beds} sectors={sectors} currentUser={currentUser} teams={teams} users={users} bedStatusConfigs={bedStatusConfigs} onUpdateOrder={handleUpdateOrder} onCompleteOrder={() => loadAllData()} />}
             {activeView === 'PESQUISA_ACOES' && <ActionsList orders={serviceOrders} services={services} beds={beds} sectors={sectors} users={users} steps={steps} />}
