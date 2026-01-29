@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ENUMS
+enum BedStatus {
+  DISPONIVEL
+  OCUPADO
+  HIGIENIZACAO
+  MANUTENCAO
+  BLOQUEADO
+}
+
+enum OrderStatus {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDO
+  CANCELADO
+  BLOQUEADO
+}
+
+enum ActionStatus {
+  PENDENTE
+  EM_ANDAMENTO
+  CONCLUIDO
+  BLOQUEADO
+}
+
+enum UserRole {
+  ADMIN
+  OPERACIONAL
+  VISUALIZADOR
+}
+
+// CORE ENTITIES
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  cnpj      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  units Unit[]
+
+  @@map("companies")
+}
+
+model Unit {
+  id        String   @id @default(cuid())
+  name      String
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sectors Sector[]
+
+  @@map("units")
+}
+
+model Sector {
+  id        String   @id @default(cuid())
+  name      String
+  unitId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  unit Unit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  beds Bed[]
+
+  @@map("sectors")
+}
+
+model Bed {
+  id        String    @id @default(cuid())
+  name      String
+  status    BedStatus @default(DISPONIVEL)
+  sectorId  String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  sector        Sector         @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+  serviceOrders ServiceOrder[]
+  bedHistory    BedHistory[]
+
+  @@index([sectorId])
+  @@index([status])
+  @@map("beds")
+}
+
+// USERS & AUTH
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String?
+  login        String?  @unique
+  cpf          String   @unique
+  passwordHash String
+  role         UserRole @default(VISUALIZADOR)
+  teamId       String?
+  companyId    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  team            Team?          @relation(fields: [teamId], references: [id])
+  requestedOrders ServiceOrder[] @relation("requestedBy")
+  assignedOrders  ServiceOrder[] @relation("assignedToUser")
+  auditLogs       AuditLog[]
+
+  @@index([cpf])
+  @@map("users")
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  companyId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users         User[]
+  serviceOrders ServiceOrder[] @relation("assignedToTeam")
+
+  @@map("teams")
+}
+
+// SERVICE ORDERS & WORKFLOW
+model ServiceType {
+  id                 String   @id @default(cuid())
+  name               String
+  description        String?
+  generateMultipleOS Boolean  @default(false)
+  companyId          String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  serviceOrders ServiceOrder[]
+  steps         Step[]
+
+  @@map("service_types")
+}
+
+model ServiceOrder {
+  id               String      @id @default(cuid())
+  groupId          String
+  bedId            String
+  serviceTypeId    String
+  subServiceName   String?
+  step             Int         @default(0)
+  status           OrderStatus @default(PENDENTE)
+  priority         Int         @default(0)
+  notes            String?
+  requestedById    String
+  assignedToTeamId String?
+  assignedToUserId String?
+  items            Json?       @default("[]")
+  history          Json?       @default("[]")
+  dependsOnOrderIds String[]   @default([])
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  completedAt      DateTime?
+
+  bed            Bed         @relation(fields: [bedId], references: [id])
+  serviceType    ServiceType @relation(fields: [serviceTypeId], references: [id])
+  requestedBy    User        @relation("requestedBy", fields: [requestedById], references: [id])
+  assignedToTeam Team?       @relation("assignedToTeam", fields: [assignedToTeamId], references: [id])
+  assignedToUser User?       @relation("assignedToUser", fields: [assignedToUserId], references: [id])
+  actions        Action[]
+
+  @@index([groupId])
+  @@index([bedId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("service_orders")
+}
+
+model Step {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  order          Int      @default(0)
+  serviceTypeId  String?
+  targetTeamId   String?
+  slaMinutes     Int?
+  allowedItemIds String[]
+  companyId      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  serviceType ServiceType? @relation(fields: [serviceTypeId], references: [id], onDelete: Cascade)
+  actions     Action[]
+
+  @@map("steps")
+}
+
+model Action {
+  id             String       @id @default(cuid())
+  serviceOrderId String
+  stepId         String
+  status         ActionStatus @default(PENDENTE)
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  completedAt    DateTime?
+
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+  step         Step         @relation(fields: [stepId], references: [id])
+
+  @@index([serviceOrderId])
+  @@index([status])
+  @@map("actions")
+}
+
+// HISTORY & AUDIT
+model BedHistory {
+  id        String    @id @default(cuid())
+  bedId     String
+  status    BedStatus
+  changedAt DateTime  @default(now())
+  notes     String?
+
+  bed Bed @relation(fields: [bedId], references: [id], onDelete: Cascade)
+
+  @@index([bedId])
+  @@index([changedAt])
+  @@map("bed_history")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String
+  changes   Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// CONFIGURATION
+model BedStatusConfig {
+  id          String   @id @default(cuid())
+  name        String
+  color       String
+  companyId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("bed_status_configs")
+}
+
+model ComplementItem {
+  id        String   @id @default(cuid())
+  name      String
+  unitCost  Float    @default(0)
+  companyId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("complement_items")
+}
