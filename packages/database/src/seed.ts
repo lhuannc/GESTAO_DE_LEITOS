@@ -86,6 +86,7 @@ async function main() {
     create: {
       id: 'team_1',
       name: 'Equipe de Limpeza',
+      companyId: company.id,
     },
   });
 

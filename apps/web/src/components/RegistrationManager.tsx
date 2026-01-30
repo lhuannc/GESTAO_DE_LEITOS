@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, OSStatus, SubOrderConfig, Team, ComplementItem, Step, BedStatusConfig } from '@gestao-leitos/types';
-import { 
-  Building2, Hospital, Layers, Bed as BedIcon, Settings, 
+import {
+  Building2, Hospital, Layers, Bed as BedIcon, Settings,
   Users, Plus, Trash2, Edit2, X, Save,
   ListPlus, Info, Users2, ArrowDown, ArrowUp, Lock,
   Package, DollarSign, CheckSquare, Link as LinkIcon,
@@ -67,7 +67,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
   const filteredItems = useMemo(() => {
     const isAdmin = currentUser.permissions.isAdmin;
     const cid = currentUser.companyId;
-    switch(activeTab) {
+    switch (activeTab) {
       case 'empresa': return companies;
       case 'unidade': return units.filter(u => isAdmin || u.companyId === cid);
       case 'setor': return sectors.filter(s => isAdmin || units.some(u => u.id === s.unitId && u.companyId === cid));
@@ -96,10 +96,10 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
 
   const openNewModal = () => {
     setIsEditing(false);
-    const baseData: any = { 
+    const baseData: any = {
       companyId: currentUser.companyId
     };
-    
+
     // Inicializar campos específicos por tipo
     if (activeTab === 'etapa') {
       baseData.targetTeamId = '';
@@ -122,7 +122,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       baseData.sectorId = '';
       baseData.status = 'DISPONIVEL';
     }
-    
+
     setFormData(baseData);
     setSuccess(false);
     setIsModalOpen(true);
@@ -130,13 +130,13 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
 
   const openEditModal = (item: any) => {
     setIsEditing(true);
-    const formDataToSet: any = { 
+    const formDataToSet: any = {
       ...item,
       userIds: item.userIds || [],
       config: item.config || { generateMultipleOS: false, subOrders: [] },
       allowedItemIds: item.allowedItemIds || [] // Para etapas
     };
-    
+
     // Se for leito, calcular companyId a partir do setor
     if (activeTab === 'leito' && item.sectorId) {
       const sector = sectors.find(s => s.id === item.sectorId);
@@ -147,7 +147,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
         }
       }
     }
-    
+
     // Se for setor, calcular companyId a partir da unidade
     if (activeTab === 'setor' && item.unitId) {
       const unit = units.find(u => u.id === item.unitId);
@@ -155,12 +155,12 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
         formDataToSet.companyId = unit.companyId;
       }
     }
-    
+
     // Se for usuário e tiver CPF, aplicar máscara
     if (activeTab === 'usuario' && item.cpf) {
       formDataToSet.cpf = maskCPF(item.cpf);
     }
-    
+
     setFormData(formDataToSet);
     setSuccess(false);
     setIsModalOpen(true);
@@ -173,7 +173,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
     setIsSubmitting(true);
     setSuccess(false);
     const typeMap: Record<TabId, string> = {
-      empresa: 'companies', unidade: 'units', setor: 'sectors', leito: 'beds', 
+      empresa: 'companies', unidade: 'units', setor: 'sectors', leito: 'beds',
       servico: 'services', usuario: 'users', equipe: 'teams', insumo: 'complementItems',
       etapa: 'steps', status: 'bedStatusConfigs'
     };
@@ -181,7 +181,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
     try {
       // Criar cópia limpa dos dados para enviar
       const dataToSave = { ...formData };
-      
+
       // Limpar campos de string vazia (converter para undefined/null para o Zod aceitar como opcional)
       Object.keys(dataToSave).forEach(key => {
         if (dataToSave[key] === '') {
@@ -192,12 +192,12 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       // Unmask de campos sensíveis
       if (dataToSave.cpf) dataToSave.cpf = unmaskCPF(dataToSave.cpf);
       if (dataToSave.cnpj) dataToSave.cnpj = dataToSave.cnpj.replace(/\D/g, '');
-      
+
       // Garantir tipos numéricos (HTML inputs podem retornar strings)
       if (dataToSave.unitCost !== undefined) dataToSave.unitCost = parseFloat(dataToSave.unitCost);
       if (dataToSave.slaMinutes !== undefined) dataToSave.slaMinutes = parseInt(dataToSave.slaMinutes);
       if (dataToSave.priority !== undefined) dataToSave.priority = parseInt(dataToSave.priority);
-      
+
       // Garantir companyId
       if (!dataToSave.companyId && currentUser.companyId) {
         dataToSave.companyId = currentUser.companyId;
@@ -205,7 +205,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
 
       await onSave(typeMap[activeTab], dataToSave);
       setSuccess(true);
-      
+
       // Delay closing to show success state
       setTimeout(() => {
         setIsModalOpen(false);
@@ -221,7 +221,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
 
   const addSubOrder = () => {
     const subOrders = [...(formData.config?.subOrders || [])];
-    subOrders.push({ 
+    subOrders.push({
       stepId: '' // Agora apenas referencia uma etapa existente
     });
     setFormData({ ...formData, config: { ...formData.config, subOrders } });
@@ -239,7 +239,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
     <div className="flex flex-col md:flex-row gap-4 md:gap-6">
       <div className="w-full md:w-56 lg:w-64 space-y-1 flex-shrink-0">
         {tabsConfig.map(tab => (
-          <button 
+          <button
             key={tab.id} onClick={() => setActiveTab(tab.id)}
             className={`w-full flex items-center space-x-2 md:space-x-3 p-2.5 md:p-3 rounded-lg font-medium transition-all text-sm ${activeTab === tab.id ? 'bg-sky-50 text-sky-700 shadow-sm border border-sky-100' : 'text-slate-500 hover:bg-slate-50'}`}
           >
@@ -255,90 +255,90 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-           <TableList 
-             items={filteredItems} 
-             onEdit={openEditModal} 
-             onDelete={(id) => onDelete(
-                activeTab === 'servico' ? 'services' : 
-                activeTab === 'equipe' ? 'teams' : 
-                activeTab === 'leito' ? 'beds' : 
-                activeTab === 'usuario' ? 'users' : 
-                activeTab === 'unidade' ? 'units' :
-                activeTab === 'setor' ? 'sectors' : 
-                activeTab === 'insumo' ? 'complementItems' :
-                activeTab === 'etapa' ? 'steps' : 'companies'
-             , id)}
-             renderRow={(item: any) => {
-               const associations = activeTab === 'insumo' ? getAssociationsForItem(item.id) : [];
-               return (
-                 <div className="flex flex-col w-full">
-                    <div className="flex justify-between items-start w-full">
-                      <div>
-                        <div className="font-bold uppercase text-slate-800 text-sm">{item.name}</div>
-                        {activeTab === 'usuario' && item.login && (
-                          <div className="flex items-center gap-1 text-[10px] text-sky-600 font-black mt-1 uppercase tracking-widest">
-                             <Fingerprint size={10} /> Login: {item.login}
-                          </div>
-                        )}
-                        {activeTab === 'insumo' && (
-                          <div className="text-[10px] text-sky-600 font-black mt-1">R$ {item.unitCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
-                        )}
-                        {activeTab === 'servico' && (
+          <TableList
+            items={filteredItems}
+            onEdit={openEditModal}
+            onDelete={(id) => onDelete(
+              activeTab === 'servico' ? 'services' :
+                activeTab === 'equipe' ? 'teams' :
+                  activeTab === 'leito' ? 'beds' :
+                    activeTab === 'usuario' ? 'users' :
+                      activeTab === 'unidade' ? 'units' :
+                        activeTab === 'setor' ? 'sectors' :
+                          activeTab === 'insumo' ? 'complementItems' :
+                            activeTab === 'etapa' ? 'steps' : 'companies'
+              , id)}
+            renderRow={(item: any) => {
+              const associations = activeTab === 'insumo' ? getAssociationsForItem(item.id) : [];
+              return (
+                <div className="flex flex-col w-full">
+                  <div className="flex justify-between items-start w-full">
+                    <div>
+                      <div className="font-bold uppercase text-slate-800 text-sm">{item.name}</div>
+                      {activeTab === 'usuario' && item.login && (
+                        <div className="flex items-center gap-1 text-[10px] text-sky-600 font-black mt-1 uppercase tracking-widest">
+                          <Fingerprint size={10} /> Login: {item.login}
+                        </div>
+                      )}
+                      {activeTab === 'insumo' && (
+                        <div className="text-[10px] text-sky-600 font-black mt-1">R$ {item.unitCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                      )}
+                      {activeTab === 'servico' && (
+                        <div className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">
+                          {(() => {
+                            const serviceSteps = steps.filter(s => s.serviceTypeId === item.id);
+                            const totalSLA = serviceSteps.reduce((t, s) => t + (s.slaMinutes || 0), 0);
+                            return (
+                              <>
+                                {item.generateMultipleOS ? `${serviceSteps.length} Ações Configuradas` : 'OS de Fluxo Único'}
+                                {totalSLA > 0 && <span className="ml-2 text-sky-600">• SLA Total: {totalSLA}min</span>}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+                      {activeTab === 'equipe' && (
+                        <div className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">
+                          {item.userIds?.length || 0} Membros associados
+                        </div>
+                      )}
+                      {activeTab === 'etapa' && (
+                        <>
+                          {item.description && <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1 italic">{item.description}</div>}
                           <div className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">
-                            {(() => {
-                              const serviceSteps = steps.filter(s => s.serviceTypeId === item.id);
-                              const totalSLA = serviceSteps.reduce((t, s) => t + (s.slaMinutes || 0), 0);
-                              return (
-                                <>
-                                  {item.generateMultipleOS ? `${serviceSteps.length} Ações Configuradas` : 'OS de Fluxo Único'}
-                                  {totalSLA > 0 && <span className="ml-2 text-sky-600">• SLA Total: {totalSLA}min</span>}
-                                </>
-                              );
-                            })()}
+                            {teams.find(t => t.id === item.targetTeamId)?.name || 'Sem equipe'} • {item.allowedItemIds?.length || 0} Insumos
+                            {item.slaMinutes && (
+                              <span className="ml-2 text-sky-600">• SLA: {item.slaMinutes}min</span>
+                            )}
                           </div>
-                        )}
-                        {activeTab === 'equipe' && (
-                          <div className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">
-                            {item.userIds?.length || 0} Membros associados
-                          </div>
-                        )}
-                        {activeTab === 'etapa' && (
-                          <>
-                            {item.description && <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-1 italic">{item.description}</div>}
-                            <div className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">
-                              {teams.find(t => t.id === item.targetTeamId)?.name || 'Sem equipe'} • {item.allowedItemIds?.length || 0} Insumos
-                              {item.slaMinutes && (
-                                <span className="ml-2 text-sky-600">• SLA: {item.slaMinutes}min</span>
-                              )}
-                            </div>
-                          </>
-                        )}
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {activeTab === 'insumo' && associations.length > 0 && (
+                    <div className="mt-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                      <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+                        <LinkIcon size={10} className="text-sky-500" />
+                        <span>Associações de Fluxo</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {associations.map((assoc, idx) => (
+                          <span key={idx} className="bg-white border border-slate-200 px-2 py-0.5 rounded text-[9px] font-bold text-slate-600 shadow-sm">
+                            {assoc.serviceName} <span className="text-sky-500 mx-1">/</span> {assoc.stepName}
+                          </span>
+                        ))}
                       </div>
                     </div>
-                    
-                    {activeTab === 'insumo' && associations.length > 0 && (
-                      <div className="mt-3 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
-                          <LinkIcon size={10} className="text-sky-500" /> 
-                          <span>Associações de Fluxo</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {associations.map((assoc, idx) => (
-                            <span key={idx} className="bg-white border border-slate-200 px-2 py-0.5 rounded text-[9px] font-bold text-slate-600 shadow-sm">
-                              {assoc.serviceName} <span className="text-sky-500 mx-1">/</span> {assoc.stepName}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {/* Fixed comparison logic: activeTab === 'insumo' check is sufficient and redundant with other tab checks here */}
-                    {activeTab === 'insumo' && associations.length === 0 && (
-                      <div className="mt-2 text-[9px] font-bold text-slate-400 italic">Registro independente</div>
-                    )}
-                 </div>
-               );
-             }}
-           />
+                  )}
+                  {/* Fixed comparison logic: activeTab === 'insumo' check is sufficient and redundant with other tab checks here */}
+                  {activeTab === 'insumo' && associations.length === 0 && (
+                    <div className="mt-2 text-[9px] font-bold text-slate-400 italic">Registro independente</div>
+                  )}
+                </div>
+              );
+            }}
+          />
         </div>
       </div>
 
@@ -348,10 +348,10 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
             <div className="p-5 md:p-7 border-b border-slate-200 flex justify-between items-center bg-gradient-to-r from-slate-50 to-white shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-sky-500/10 rounded-xl flex items-center justify-center">
-                  {activeTab === 'servico' ? <Settings size={20} className="text-sky-600" /> : 
-                   activeTab === 'leito' ? <BedIcon size={20} className="text-sky-600" /> :
-                   activeTab === 'usuario' ? <Users size={20} className="text-sky-600" /> :
-                   <Building2 size={20} className="text-sky-600" />}
+                  {activeTab === 'servico' ? <Settings size={20} className="text-sky-600" /> :
+                    activeTab === 'leito' ? <BedIcon size={20} className="text-sky-600" /> :
+                      activeTab === 'usuario' ? <Users size={20} className="text-sky-600" /> :
+                        <Building2 size={20} className="text-sky-600" />}
                 </div>
                 <div>
                   <h4 className="font-black text-slate-800 text-lg md:text-xl">
@@ -362,24 +362,24 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
               >
                 <X size={22} className="text-slate-400" />
               </button>
             </div>
-            
+
             <form onSubmit={handleFormSubmit} className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 flex-1 overflow-y-auto scrollbar-hide">
-              <Input label={activeTab === 'usuario' ? 'Nome Completo' : 'Nome Identificador'} value={formData.name} onChange={v => setFormData({...formData, name: v})} required />
+              <Input label={activeTab === 'usuario' ? 'Nome Completo' : 'Nome Identificador'} value={formData.name} onChange={v => setFormData({ ...formData, name: v })} required />
 
               {activeTab === 'empresa' && (
-                <Input 
-                  label="CNPJ" 
-                  value={formData.cnpj || ''} 
-                  onChange={v => setFormData({...formData, cnpj: v})} 
+                <Input
+                  label="CNPJ"
+                  value={formData.cnpj || ''}
+                  onChange={v => setFormData({ ...formData, cnpj: v })}
                   placeholder="00.000.000/0000-00"
-                  required 
+                  required
                 />
               )}
 
@@ -403,7 +403,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
               )}
 
               {activeTab === 'servico' && (
-                <Input label="Descrição" value={formData.description || ''} onChange={v => setFormData({...formData, description: v})} />
+                <Input label="Descrição" value={formData.description || ''} onChange={v => setFormData({ ...formData, description: v })} />
               )}
 
               {activeTab === 'setor' && (
@@ -465,7 +465,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                       <option value="MANUTENCAO">Manutenção</option>
                       <option value="AGUARDANDO_ALTA">Aguardando Alta</option>
                       <option value="BLOQUEADO">Bloqueado</option>
-                      
+
                       {/* Mostrar status personalizados como opções extras se o nome bater com os ENUMs ou se quisermos estender futuramente */}
                       {bedStatusConfigs.filter(s => {
                         const companyId = formData.companyId || currentUser.companyId;
@@ -484,21 +484,21 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
 
               {activeTab === 'usuario' && (
                 <>
-                  <Input label="E-mail" value={formData.email} onChange={v => setFormData({...formData, email: v})} icon={<Mail size={16}/>} required />
-                  <Input 
-                    label="CPF" 
-                    value={formData.cpf ? maskCPF(formData.cpf) : ''} 
+                  <Input label="E-mail" value={formData.email} onChange={v => setFormData({ ...formData, email: v })} icon={<Mail size={16} />} required />
+                  <Input
+                    label="CPF"
+                    value={formData.cpf ? maskCPF(formData.cpf) : ''}
                     onChange={v => {
                       const masked = maskCPF(v);
-                      setFormData({...formData, cpf: masked});
-                    }} 
-                    icon={<CreditCard size={16}/>} 
-                    required 
+                      setFormData({ ...formData, cpf: masked });
+                    }}
+                    icon={<CreditCard size={16} />}
+                    required
                     maxLength={14}
                   />
                   <div className="grid grid-cols-2 gap-4">
-                    <Input label="Login de Acesso" value={formData.login} onChange={v => setFormData({...formData, login: v})} icon={<Fingerprint size={16}/>} required />
-                    <Input label="Senha" type="password" value={formData.password} onChange={v => setFormData({...formData, password: v})} icon={<ShieldCheck size={16}/>} required />
+                    <Input label="Login de Acesso" value={formData.login} onChange={v => setFormData({ ...formData, login: v })} icon={<Fingerprint size={16} />} required />
+                    <Input label="Senha" type="password" value={formData.password} onChange={v => setFormData({ ...formData, password: v })} icon={<ShieldCheck size={16} />} required />
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
@@ -519,24 +519,19 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
               )}
 
               {activeTab === 'insumo' && (
-                <Input label="Custo Unitário (R$)" type="number" step="0.01" value={formData.unitCost} onChange={v => setFormData({...formData, unitCost: parseFloat(v)})} required />
+                <Input label="Custo Unitário (R$)" type="number" step="0.01" value={formData.unitCost} onChange={v => setFormData({ ...formData, unitCost: parseFloat(v) })} required />
               )}
 
               {activeTab === 'etapa' && (
                 <div className="space-y-4">
-                  <Input label="Descrição da Ação" value={formData.description || ''} onChange={v => setFormData({...formData, description: v})} />
+                  <Input label="Descrição da Ação" value={formData.description || ''} onChange={v => setFormData({ ...formData, description: v })} />
 
                   <div className="grid grid-cols-2 gap-4">
-                    <Input 
-                      label="Ordem (Opcional)" 
-                      value={formData.order === undefined ? '0' : formData.order.toString()} 
-                      onChange={v => setFormData({...formData, order: parseInt(v) || 0})} 
-                      type="number"
-                    />
+
                     <Input
                       label="SLA (minutos)"
                       value={formData.slaMinutes || ''}
-                      onChange={(v) => setFormData({...formData, slaMinutes: v ? parseInt(v) : ''})}
+                      onChange={(v) => setFormData({ ...formData, slaMinutes: v ? parseInt(v) : '' })}
                       type="number"
                       icon={<Clock size={14} className="text-sky-500" />}
                     />
@@ -546,9 +541,9 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block flex items-center gap-2">
                       <Users2 size={14} className="text-sky-500" /> Equipe Responsável
                     </label>
-                    <select 
-                      value={formData.targetTeamId || ''} 
-                      onChange={(e) => setFormData({...formData, targetTeamId: e.target.value})}
+                    <select
+                      value={formData.targetTeamId || ''}
+                      onChange={(e) => setFormData({ ...formData, targetTeamId: e.target.value })}
                       className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none text-sm font-bold text-slate-700"
                       required
                     >
@@ -574,13 +569,12 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                               const idx = allowed.indexOf(item.id);
                               if (idx > -1) allowed.splice(idx, 1);
                               else allowed.push(item.id);
-                              setFormData({...formData, allowedItemIds: allowed});
+                              setFormData({ ...formData, allowedItemIds: allowed });
                             }}
-                            className={`px-3 py-2 rounded-xl text-[10px] font-black border transition-all ${
-                              isSelected 
-                                ? 'bg-sky-500 text-white border-sky-600 shadow-md' 
+                            className={`px-3 py-2 rounded-xl text-[10px] font-black border transition-all ${isSelected
+                                ? 'bg-sky-500 text-white border-sky-600 shadow-md'
                                 : 'bg-white text-slate-400 border-slate-100 hover:border-slate-300'
-                            }`}
+                              }`}
                           >
                             {item.name}
                           </button>
@@ -614,7 +608,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                         <button
                           key={color}
                           type="button"
-                          onClick={() => setFormData({...formData, color})}
+                          onClick={() => setFormData({ ...formData, color })}
                           className={`h-12 rounded-xl transition-all ${formData.color === color ? 'ring-4 ring-offset-2 ring-sky-500 scale-95' : 'hover:scale-105 hover:shadow-lg'}`}
                         >
                           <div className={`w-full h-full rounded-lg ${color}`}></div>
@@ -661,41 +655,40 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
 
               {activeTab === 'servico' && (
                 <div className="space-y-4">
-                   <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                      <div className="flex items-center space-x-2">
-                        <ListPlus size={18} className="text-sky-600" />
-                        <span className="font-bold text-slate-700 text-sm">Dependência Sequencial Automática (Fluxo de Ações)</span>
-                      </div>
-                      <input 
-                        type="checkbox" 
-                        checked={formData.generateMultipleOS || false} 
-                        onChange={(e) => setFormData({...formData, generateMultipleOS: e.target.checked})}
-                        className="w-5 h-5 rounded accent-sky-600 cursor-pointer"
-                      />
-                   </div>
-                   <p className="text-[10px] text-slate-400 italic px-2">
-                     * Se ativado, este serviço utilizará as etapas definidas na aba "Etapas" para gerenciar o fluxo de trabalho.
-                   </p>
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div className="flex items-center space-x-2">
+                      <ListPlus size={18} className="text-sky-600" />
+                      <span className="font-bold text-slate-700 text-sm">Dependência Sequencial Automática (Fluxo de Ações)</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={formData.generateMultipleOS || false}
+                      onChange={(e) => setFormData({ ...formData, generateMultipleOS: e.target.checked })}
+                      className="w-5 h-5 rounded accent-sky-600 cursor-pointer"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 italic px-2">
+                    * Se ativado, este serviço utilizará as etapas definidas na aba "Etapas" para gerenciar o fluxo de trabalho.
+                  </p>
 
 
                 </div>
               )}
 
               <div className="pt-3 md:pt-4 flex space-x-2 md:space-x-3 shrink-0">
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)} 
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
                   disabled={isSubmitting}
                   className="flex-1 py-3 md:py-4 bg-slate-100 text-slate-600 font-bold rounded-xl md:rounded-2xl hover:bg-slate-200 transition-colors uppercase text-xs disabled:opacity-50"
                 >
                   Cancelar
                 </button>
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSubmitting || success}
-                  className={`flex-1 py-3 md:py-4 font-bold rounded-xl md:rounded-2xl transition-all shadow-lg flex items-center justify-center space-x-2 uppercase text-xs ${
-                    success ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white hover:bg-black'
-                  } disabled:opacity-50`}
+                  className={`flex-1 py-3 md:py-4 font-bold rounded-xl md:rounded-2xl transition-all shadow-lg flex items-center justify-center space-x-2 uppercase text-xs ${success ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-white hover:bg-black'
+                    } disabled:opacity-50`}
                 >
                   {isSubmitting ? (
                     <>
@@ -741,9 +734,9 @@ const TableList = ({ items, renderRow, onDelete, onEdit }: { items: any[], rende
 const Input = ({ label, value, onChange, required, type = "text", step, icon, maxLength, placeholder }: { label: string, value: string | number, onChange: (v: string) => void, required?: boolean, type?: string, step?: string, icon?: React.ReactNode, maxLength?: number, placeholder?: string }) => (
   <div>
     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-       {icon} {label}
+      {icon} {label}
     </label>
-    <input 
+    <input
       type={type} step={step} required={required} value={value ?? ''} onChange={e => onChange(e.target.value)}
       maxLength={maxLength}
       placeholder={placeholder}

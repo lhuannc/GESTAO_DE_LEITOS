@@ -2,6 +2,7 @@
   "name": "@gestao-leitos/database",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "main": "./src/backend.ts",
   "types": "./src/backend.ts",
   "scripts": {
