@@ -187,14 +187,17 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
   const validation = useMemo(() => {
     if (!selectedService) return { isValid: false, missingSteps: [] };
 
-    const steps = selectedService.config?.subOrders || [{ name: 'Atendimento Geral', allowedItemIds: [] }];
+    // Check against effective steps total
     const missingSteps: number[] = [];
 
     // Validar apenas etapas ativas
     activeSteps.forEach(stepIdx => {
-      const itemsInStep = Object.keys(selectedItemsPerStep[stepIdx] || {}).length;
-      if (itemsInStep === 0) {
-        missingSteps.push(stepIdx);
+      // Check if this step index is valid in effectiveSteps
+      if (stepIdx < effectiveSteps.length) {
+        const itemsInStep = Object.keys(selectedItemsPerStep[stepIdx] || {}).length;
+        if (itemsInStep === 0) {
+          missingSteps.push(stepIdx);
+        }
       }
     });
 
@@ -205,7 +208,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
       isValid: missingSteps.length === 0 && selectedBedId !== '' && selectedServiceId !== '' && hasActiveSteps,
       missingSteps
     };
-  }, [selectedService, selectedItemsPerStep, selectedBedId, selectedServiceId, activeSteps]);
+  }, [selectedService, selectedItemsPerStep, selectedBedId, selectedServiceId, activeSteps, effectiveSteps]);
 
   const totalCost = useMemo(() => {
     let total = 0;
@@ -222,13 +225,14 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
     e.preventDefault();
     if (!validation.isValid || createOrderMutation.isPending) return;
 
-    const selectedStepsData = Array.from(activeSteps).map(stepIdx => {
-      const stepItems = Object.entries(selectedItemsPerStep[stepIdx] || {}).map(([itemId, qty]) => {
+    const selectedStepsData = Array.from(activeSteps).map((stepIdx: number) => {
+      const itemsMap = selectedItemsPerStep[stepIdx] || {};
+      const stepItems = Object.entries(itemsMap).map(([itemId, qty]) => {
         const item = complementItems.find(i => i.id === itemId);
         return {
           itemId,
           name: item?.name || 'Item',
-          quantity: qty,
+          quantity: Number(qty),
           unitCost: item?.unitCost || 0,
         };
       });
@@ -603,7 +607,8 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
               {Object.entries(selectedItemsPerStep).map(([stepIdx, items]) => (
                 Object.entries(items).map(([itemId, qty]) => {
                   const item = complementItems.find(i => i.id === itemId);
-                  const sub = (selectedService?.config?.subOrders || [])[parseInt(stepIdx)];
+                  const stepIndex = parseInt(stepIdx);
+                  const sub = effectiveSteps[stepIndex];
                   const step = sub?.stepId ? steps.find(s => s.id === sub.stepId) : null;
                   const subName = step?.name || sub?.name || 'Geral';
                   return (
