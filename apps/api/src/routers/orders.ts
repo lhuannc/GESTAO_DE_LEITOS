@@ -2,6 +2,29 @@ import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
 
+// Helper to check if all dependencies are met
+const checkDependencies = async (ctx: any, orderId: string, ignoreOrderIds: string[] = []) => {
+  const order = await ctx.prisma.serviceOrder.findUnique({
+    where: { id: orderId },
+    select: { dependsOnOrderIds: true }
+  });
+
+  if (!order || !order.dependsOnOrderIds || order.dependsOnOrderIds.length === 0) return true;
+
+  const dependencies = await ctx.prisma.serviceOrder.findMany({
+    where: {
+      id: { in: order.dependsOnOrderIds }
+    },
+    select: { id: true, status: true }
+  });
+
+  // Check if ALL dependencies are CONCLUIDO (ignoring specific IDs that are currently being completed)
+  return dependencies.every((d: { id: string; status: string }) => {
+    if (ignoreOrderIds.includes(d.id)) return true; // Treat ignored ones as effectively "done" for this check
+    return d.status === 'CONCLUIDO';
+  });
+};
+
 /**
  * Service Orders Router
  */
@@ -95,7 +118,7 @@ export const ordersRouter = router({
       const groupId = `grp_${Math.random().toString(36).substr(2, 9)}`;
       const orders = [];
       const createdOrderIds: string[] = [];
-      
+
       // Determine configuration from config field or related steps
       const config = (serviceType as any).config || {};
       const subOrders = config.subOrders || (serviceType.steps as any[]).map((s, idx) => ({
@@ -114,12 +137,23 @@ export const ordersRouter = router({
       for (let i = 0; i < stepsToCreate.length; i++) {
         const stepInput = stepsToCreate[i];
         const stepConfig = subOrders[stepInput.stepIdx];
-        
+
         if (!stepConfig) continue;
 
         const isFirst = i === 0;
         let initialStatus: 'PENDENTE' | 'BLOQUEADO' = isFirst ? 'PENDENTE' : 'BLOQUEADO';
         const dependsOn = isFirst ? [] : [createdOrderIds[i - 1]];
+
+        // Handle External Dependency (Input)
+        // Only apply dependency to the FIRST step if specified (or any step if we want granular control, 
+        // but UI typically sets it for the whole flow or specific steps. The input has `dependency` per step).
+        if (stepInput.dependency && stepInput.dependency.bedId) {
+          const dep = stepInput.dependency;
+          if (dep.type === 'BLOQUEADA' && dep.actionId) {
+            initialStatus = 'BLOQUEADO';
+            dependsOn.push(dep.actionId);
+          }
+        }
 
         // Create the order
         const order = await ctx.prisma.serviceOrder.create({
@@ -147,6 +181,28 @@ export const ordersRouter = router({
           },
         });
 
+        // Handle 'BLOQUEADOR' type - The new order BLOCKS an existing order
+        if (stepInput.dependency && stepInput.dependency.type === 'BLOQUEADOR' && stepInput.dependency.actionId) {
+          // We need to update the TARGET order to depend on THIS new order
+          await ctx.prisma.serviceOrder.update({
+            where: { id: stepInput.dependency.actionId },
+            data: {
+              status: 'BLOQUEADO',
+              dependsOnOrderIds: {
+                push: order.id
+              },
+              history: {
+                push: {
+                  status: 'BLOQUEADO',
+                  userId: ctx.userId!,
+                  timestamp: new Date().toISOString(),
+                  note: `Bloqueado por nova solicitação: ${stepConfig.name || 'Geral'}`,
+                }
+              }
+            }
+          });
+        }
+
         // Update bed status if it's the first step and has an initial status
         if (isFirst && stepConfig.bedStatusConfig?.onStart) {
           await ctx.prisma.bed.update({
@@ -154,7 +210,7 @@ export const ordersRouter = router({
             data: { status: stepConfig.bedStatusConfig.onStart },
           });
         }
-        
+
         createdOrderIds.push(order.id);
         orders.push(order);
       }
@@ -230,8 +286,9 @@ export const ordersRouter = router({
         }
       }
 
-      // If finished, release next step
+      // If finished, release next step and explicitly dependent orders
       if (input.status === 'CONCLUIDO') {
+        // 1. Release next sequential step in the same group
         const nextOrder = await ctx.prisma.serviceOrder.findFirst({
           where: {
             groupId: order.groupId,
@@ -241,20 +298,58 @@ export const ordersRouter = router({
         });
 
         if (nextOrder) {
-          await ctx.prisma.serviceOrder.update({
-            where: { id: nextOrder.id },
-            data: {
-              status: 'PENDENTE',
-              history: {
-                push: {
-                  status: 'PENDENTE',
-                  userId: 'system',
-                  timestamp: new Date().toISOString(),
-                  note: 'Liberado automaticamente após conclusão da etapa anterior',
+          // Check if it has other dependencies besides the sequential one (if any logic requires it, 
+          // but usually sequential is implicit. However, if mixed with explicit dependencies, we should check).
+          // For now, keeping original sequential behavior but verifying explicit dependencies too.
+
+          const canRelease = await checkDependencies(ctx, nextOrder.id, [order.id]); // Ignore current order as it's being finished
+
+          if (canRelease) {
+            await ctx.prisma.serviceOrder.update({
+              where: { id: nextOrder.id },
+              data: {
+                status: 'PENDENTE',
+                history: {
+                  push: {
+                    status: 'PENDENTE',
+                    userId: 'system',
+                    timestamp: new Date().toISOString(),
+                    note: 'Liberado automaticamente após conclusão da etapa anterior',
+                  },
                 },
               },
+            });
+          }
+        }
+
+        // 2. Release other orders that depend on this one (Explicit Dependencies)
+        const dependentOrders = await ctx.prisma.serviceOrder.findMany({
+          where: {
+            dependsOnOrderIds: {
+              has: order.id
             },
-          });
+            status: 'BLOQUEADO'
+          }
+        });
+
+        for (const depOrder of dependentOrders) {
+          const canRelease = await checkDependencies(ctx, depOrder.id, [order.id]);
+          if (canRelease) {
+            await ctx.prisma.serviceOrder.update({
+              where: { id: depOrder.id },
+              data: {
+                status: 'PENDENTE',
+                history: {
+                  push: {
+                    status: 'PENDENTE',
+                    userId: 'system',
+                    timestamp: new Date().toISOString(),
+                    note: `Liberado automaticamente: Dependência ${order.subServiceName} (ID: ${order.id.slice(-6)}) concluída`,
+                  },
+                },
+              },
+            });
+          }
         }
       }
 

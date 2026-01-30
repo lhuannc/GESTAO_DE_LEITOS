@@ -19,12 +19,12 @@ Implementar a funcionalidade que permite que uma Ordem de Serviço (OS) dependa 
 
 ## Checklist de Tarefas
 
-- [ ] Implementação Backend <!-- id: 40 -->
-    - [ ] Validar e processar objeto `dependency` no `create` <!-- id: 41 -->
-    - [ ] Implementar busca de dependentes no `updateStatus` <!-- id: 42 -->
-- [ ] Implementação Frontend <!-- id: 43 -->
-    - [ ] Criar Componente `OrderDependencyTable.tsx` <!-- id: 44 -->
-    - [ ] Adicionar campos de dependência em `ServiceRequestForm.tsx` <!-- id: 45 -->
-    - [ ] Exibir alertas de bloqueio no `ServiceOrdersKanban.tsx` <!-- id: 46 -->
+- [x] Implementação Backend <!-- id: 40 -->
+    - [x] Validar e processar objeto `dependency` no `create` <!-- id: 41 -->
+    - [x] Implementar busca de dependentes no `updateStatus` <!-- id: 42 -->
+- [x] Implementação Frontend <!-- id: 43 -->
+    - [x] Criar Componente `OrderDependencyTable.tsx` <!-- id: 44 -->
+    - [x] Adicionar campos de dependência em `ServiceRequestForm.tsx` (Lógica de fetch de ordens ativas adicionada) <!-- id: 45 -->
+    - [ ] Exibir alertas de bloqueio no `ServiceOrdersKanban.tsx` (Já parcialmente visualizado na UI existente) <!-- id: 46 -->
 - [ ] Verificação <!-- id: 47 -->
     - [ ] Testar fluxo: OS A bloqueia OS B -> Concluir OS A -> OS B liberada <!-- id: 48 -->

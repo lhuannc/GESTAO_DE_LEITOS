@@ -10,6 +10,7 @@ import { unitsRouter } from './units';
 import { sectorsRouter } from './sectors';
 import { stepsRouter } from './steps';
 import { configRouter } from './config';
+import { complementItemsRouter } from './complementItems';
 
 /**
  * Main application router
@@ -27,6 +28,7 @@ export const appRouter = router({
   sectors: sectorsRouter,
   steps: stepsRouter,
   config: configRouter,
+  complementItems: complementItemsRouter,
 });
 
 export type AppRouter = typeof appRouter;

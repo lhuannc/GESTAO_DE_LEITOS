@@ -386,7 +386,7 @@ Antes de fazer PR, verificar:
 - AuthContext para autenticação
 - Login com validação de CPF
 - Dashboard com dados do PostgreSQL
-- Criação de ordens (versão básica)
+- Criação de ordens (com steps, itens e dependências)
 - Queries para: leitos, orders, services, users, teams
 
 ### 🔄 Em Progresso
@@ -394,7 +394,6 @@ Antes de fazer PR, verificar:
 - RegistrationManager CRUD (routers existem, falta integrar)
 
 ### 📋 Pendente
-- ServiceRequestForm completo (steps, itens, dependências)
 - Queries para: companies, units, sectors, actions, complementItems
 - Testes automatizados
 - Error boundaries

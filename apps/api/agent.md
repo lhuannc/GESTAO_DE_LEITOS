@@ -238,6 +238,18 @@ import { validateCPF } from '@gestao-leitos/utils';
 }))
 ```
 
+### Dependência de Ordens (Bloqueios)
+
+O sistema suporta dependências entre ordens de serviço para encadear fluxos de trabalho complexos.
+
+1.  **Tipos de Dependência**:
+    *   **BLOQUEADA**: A nova ordem nasce com status `BLOQUEADO` e aguarda a conclusão da ordem alvo.
+    *   **BLOQUEADOR**: A nova ordem bloqueia uma ordem existente (que muda para `BLOQUEADO`) e deve ser concluída antes dela.
+
+2.  **Liberação Automática**:
+    *   Quando uma ordem é concluída (`updateStatus` -> `CONCLUIDO`), o sistema verifica se existem outras ordens que dependem dela (`dependsOnOrderIds`).
+    *   Se TODAS as dependências de uma ordem bloqueada estiverem concluídas, ela é liberada automaticamente para `PENDENTE`.
+
 ### Auditoria
 
 **Todas as mutations DEVEM criar audit log**
