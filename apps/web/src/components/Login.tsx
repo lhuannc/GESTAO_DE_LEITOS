@@ -15,9 +15,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: (data) => {
-      // Store userId for API requests
-      localStorage.setItem('userId', data.user.id);
-      localStorage.setItem('gestao_leitos_session', JSON.stringify(data.user));
+      // JWT cookie is automatically set by backend (HttpOnly)
+      // No need to store anything in localStorage
+      // No need to reload page - cookies are sent automatically
       onLoginSuccess(data.user);
     },
     onError: (err) => {

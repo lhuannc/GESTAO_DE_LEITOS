@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { User } from '@gestao-leitos/types';
 
 interface AuthContextType {
@@ -12,24 +12,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  useEffect(() => {
-    // Load user from localStorage on mount
-    const savedUser = localStorage.getItem('gestao_leitos_session');
-    if (savedUser) {
-      try {
-        const user = JSON.parse(savedUser);
-        setCurrentUser(user);
-      } catch (error) {
-        console.error('Failed to parse saved user:', error);
-        localStorage.removeItem('gestao_leitos_session');
-      }
-    }
-  }, []);
+  // No longer using localStorage - session is managed via JWT cookie
+  // The App component will check auth status using trpc.auth.me
 
   const logout = () => {
     setCurrentUser(null);
-    localStorage.removeItem('gestao_leitos_session');
-    localStorage.removeItem('userId');
+    // Cookie will be cleared by calling trpc.auth.logout
   };
 
   return (

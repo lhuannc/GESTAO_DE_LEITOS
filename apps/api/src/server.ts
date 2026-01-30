@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import fastifyCookie from '@fastify/cookie';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import { TRPCError } from '@trpc/server';
 import { appRouter } from './routers';
@@ -21,14 +22,19 @@ const server = Fastify({
 });
 
 async function main() {
-  // CORS
+  // Cookie parser (must be registered before routes)
+  await server.register(fastifyCookie, {
+    secret: process.env.COOKIE_SECRET || 'dev-cookie-secret-change-in-production',
+  });
+
+  // CORS with credentials support
   await server.register(cors, {
     origin: [
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://127.0.0.1:3000',
       'http://localhost:3000'
     ],
-    credentials: true,
+    credentials: true, // Allow cookies to be sent
   });
 
   // tRPC

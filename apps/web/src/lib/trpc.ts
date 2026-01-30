@@ -9,9 +9,13 @@ export function getTRPCClient() {
     links: [
       httpBatchLink({
         url: 'http://localhost:4000/trpc',
-        headers() {
-          const userId = localStorage.getItem('userId');
-          return userId ? { 'x-user-id': userId } : {};
+        // Include cookies in all requests
+        // This allows JWT cookie to be sent automatically
+        fetch(url, options) {
+          return fetch(url, {
+            ...options,
+            credentials: 'include', // Send cookies cross-origin
+          });
         },
       }),
     ],

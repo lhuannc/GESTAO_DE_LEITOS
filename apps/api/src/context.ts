@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { prisma } from '@gestao-leitos/database/client';
+import { verifyToken } from './utils/jwt';
 
 export async function createContext({
   req,
@@ -8,8 +9,21 @@ export async function createContext({
   req: FastifyRequest;
   res: FastifyReply;
 }) {
-  // Extract user from session/JWT
-  const userId = req.headers['x-user-id'] as string | undefined;
+  let userId: string | undefined;
+
+  // Extract JWT from cookie
+  const token = req.cookies.token;
+
+  if (token) {
+    try {
+      const payload = verifyToken(token);
+      userId = payload.userId;
+    } catch (error) {
+      // Invalid or expired token - log but don't throw
+      // This allows public endpoints to work
+      console.warn('JWT verification failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
 
   return {
     prisma,

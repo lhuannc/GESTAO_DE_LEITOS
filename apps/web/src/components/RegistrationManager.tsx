@@ -658,18 +658,130 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                   <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200">
                     <div className="flex items-center space-x-2">
                       <ListPlus size={18} className="text-sky-600" />
-                      <span className="font-bold text-slate-700 text-sm">Dependência Sequencial Automática (Fluxo de Ações)</span>
+                      <span className="font-bold text-slate-700 text-sm">Dependência Sequencial Automática</span>
                     </div>
                     <input
-                      type="checkbox"
-                      checked={formData.generateMultipleOS || false}
-                      onChange={(e) => setFormData({ ...formData, generateMultipleOS: e.target.checked })}
+                      type="checkbox" checked={formData.config?.generateMultipleOS}
+                      onChange={(e) => setFormData({ ...formData, generateMultipleOS: e.target.checked, config: { ...formData.config, generateMultipleOS: e.target.checked, subOrders: e.target.checked ? (formData.config?.subOrders || []) : [] } })}
                       className="w-5 h-5 rounded accent-sky-600 cursor-pointer"
                     />
                   </div>
-                  <p className="text-[10px] text-slate-400 italic px-2">
-                    * Se ativado, este serviço utilizará as etapas definidas na aba "Etapas" para gerenciar o fluxo de trabalho.
-                  </p>
+
+                  {formData.config?.generateMultipleOS && (
+                    <div className="space-y-4">
+                      {formData.config.subOrders?.map((sub: any, idx: number) => {
+                        const step = sub.stepId ? steps.find(s => s.id === sub.stepId) : null;
+                        const stepName = step?.name || (sub as any).name || `Etapa ${idx + 1}`;
+                        const stepTeamId = step?.targetTeamId || (sub as any).targetTeamId || '';
+
+                        return (
+                          <div key={idx} className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-4">
+                            <div className="flex justify-between items-center">
+                              <select
+                                value={sub.stepId || ''}
+                                onChange={(e) => {
+                                  const subOrders = [...formData.config.subOrders];
+                                  const selectedStep = steps.find(s => s.id === e.target.value);
+                                  if (selectedStep) {
+                                    subOrders[idx] = {
+                                      ...subOrders[idx],
+                                      stepId: selectedStep.id,
+                                      name: selectedStep.name,
+                                      targetTeamId: selectedStep.targetTeamId,
+                                      allowedItemIds: selectedStep.allowedItemIds
+                                    };
+                                  } else {
+                                    subOrders[idx] = { ...subOrders[idx], stepId: e.target.value };
+                                  }
+                                  setFormData({ ...formData, config: { ...formData.config, subOrders } });
+                                }}
+                                className="flex-1 text-xs font-bold p-2 bg-slate-50 rounded-lg outline-none"
+                                required
+                              >
+                                <option value="">Selecione uma ação...</option>
+                                {steps.filter(s => s.companyId === formData.companyId).map(s => (
+                                  <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                              </select>
+                              <button type="button" onClick={() => {
+                                const subOrders = formData.config.subOrders.filter((_: any, i: number) => i !== idx);
+                                setFormData({ ...formData, config: { ...formData.config, subOrders } });
+                              }} className="text-rose-400 p-2 ml-2 hover:bg-rose-50 rounded-xl"><Trash2 size={16} /></button>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Status ao Iniciar</label>
+                                <select
+                                  value={sub.bedStatusConfig?.onStart || ''}
+                                  onChange={(e) => {
+                                    const subOrders = [...formData.config.subOrders];
+                                    subOrders[idx] = {
+                                      ...subOrders[idx],
+                                      bedStatusConfig: { ...subOrders[idx].bedStatusConfig, onStart: e.target.value }
+                                    };
+                                    setFormData({ ...formData, config: { ...formData.config, subOrders } });
+                                  }}
+                                  className="w-full text-[10px] font-bold p-2 bg-slate-50 border border-slate-100 rounded-lg outline-none"
+                                >
+                                  <option value="">Manter atual</option>
+                                  {['DISPONIVEL', 'OCUPADO', 'HIGIENIZACAO', 'MANUTENCAO', 'BLOQUEADO'].map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                  ))}
+                                  {bedStatusConfigs.filter(bc => bc.companyId === formData.companyId).map(bc => (
+                                    <option key={bc.id} value={bc.name}>{bc.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Status ao Finalizar</label>
+                                <select
+                                  value={sub.bedStatusConfig?.onFinish || ''}
+                                  onChange={(e) => {
+                                    const subOrders = [...formData.config.subOrders];
+                                    subOrders[idx] = {
+                                      ...subOrders[idx],
+                                      bedStatusConfig: { ...subOrders[idx].bedStatusConfig, onFinish: e.target.value }
+                                    };
+                                    setFormData({ ...formData, config: { ...formData.config, subOrders } });
+                                  }}
+                                  className="w-full text-[10px] font-bold p-2 bg-slate-50 border border-slate-100 rounded-lg outline-none"
+                                >
+                                  <option value="">Manter atual</option>
+                                  {['DISPONIVEL', 'OCUPADO', 'HIGIENIZACAO', 'MANUTENCAO', 'BLOQUEADO'].map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                  ))}
+                                  {bedStatusConfigs.filter(bc => bc.companyId === formData.companyId).map(bc => (
+                                    <option key={bc.id} value={bc.name}>{bc.name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            {step && (
+                              <div className="p-3 bg-sky-50 rounded-xl border border-sky-100 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="text-[10px] font-black text-sky-700 uppercase">{stepName}</p>
+                                    <p className="text-[9px] text-slate-500 mt-1">
+                                      Equipe: {teams.find(t => t.id === stepTeamId)?.name || 'Não definida'}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Lock size={12} className={idx === 0 ? 'text-emerald-500' : 'text-slate-300'} />
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase">{idx === 0 ? 'Liberado' : 'Bloqueado'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <button type="button" onClick={addSubOrder} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-xs font-bold text-slate-400 hover:text-sky-500 hover:border-sky-300 flex items-center justify-center space-x-2 bg-slate-50/30">
+                        <Plus size={16} /> <span>Adicionar Ação ao Fluxo</span>
+                      </button>
+                    </div>
+                  )}
 
 
                 </div>

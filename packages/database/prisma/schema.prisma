@@ -135,6 +135,7 @@ model ServiceType {
   name               String
   description        String?
   generateMultipleOS Boolean  @default(false)
+  config             Json?    @default("{}")
   companyId          String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

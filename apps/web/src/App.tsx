@@ -182,9 +182,15 @@ const App: React.FC = () => {
     setCurrentUser(user);
   };
 
+  const logoutMutation = trpc.auth.logout.useMutation({
+    onSuccess: () => {
+      logout(); // Clear local state
+      setActiveView('DASHBOARD');
+    },
+  });
+
   const handleLogout = () => {
-    logout();
-    setActiveView('DASHBOARD');
+    logoutMutation.mutate();
   };
 
   const handleUpdateOrder = async () => {

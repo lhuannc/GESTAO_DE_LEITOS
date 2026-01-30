@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { router, publicProcedure, protectedProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
 import { compare } from 'bcrypt';
+import { signToken, getCookieOptions } from '../utils/jwt';
 
 /**
  * Authentication Router
@@ -43,6 +44,16 @@ export const authRouter = router({
         });
       }
 
+      // Generate JWT token
+      const token = signToken({
+        userId: user.id,
+        role: user.role,
+      });
+
+      // Set HttpOnly cookie with JWT
+      // In production (HTTPS), cookie will have Secure flag automatically
+      ctx.res.setCookie('token', token, getCookieOptions());
+
       // Create audit log
       await ctx.prisma.auditLog.create({
         data: {
@@ -50,7 +61,7 @@ export const authRouter = router({
           action: 'LOGIN',
           entity: 'User',
           entityId: user.id,
-          changes: null,
+          changes: undefined, // No changes for login
         },
       });
 
@@ -68,8 +79,7 @@ export const authRouter = router({
 
       return {
         user: formattedUser,
-        // In production, return JWT token here
-        token: user.id, // Simplified for now
+        // Token is in HttpOnly cookie, not returned in response
       };
     }),
 
@@ -104,18 +114,26 @@ export const authRouter = router({
 
   /**
    * Logout
+   * Clears the JWT cookie
    */
-  logout: protectedProcedure.mutation(async ({ ctx }) => {
-    // Create audit log
-    await ctx.prisma.auditLog.create({
-      data: {
-        userId: ctx.userId!,
-        action: 'LOGOUT',
-        entity: 'User',
-        entityId: ctx.userId!,
-        changes: null,
-      },
+  logout: publicProcedure.mutation(async ({ ctx }) => {
+    // Clear the JWT cookie
+    ctx.res.clearCookie('token', {
+      path: '/',
     });
+
+    // Create audit log if user was authenticated
+    if (ctx.userId) {
+      await ctx.prisma.auditLog.create({
+        data: {
+          userId: ctx.userId,
+          action: 'LOGOUT',
+          entity: 'User',
+          entityId: ctx.userId,
+          changes: undefined, // No changes for logout
+        },
+      });
+    }
 
     return { success: true };
   }),

@@ -37,6 +37,7 @@ export const servicesRouter = router({
         name: z.string().min(1),
         description: z.string().optional(),
         generateMultipleOS: z.boolean().default(false),
+        config: z.any().optional(),
         companyId: z.string().optional(),
       })
     )
@@ -46,6 +47,7 @@ export const servicesRouter = router({
           name: input.name,
           description: input.description,
           generateMultipleOS: input.generateMultipleOS,
+          config: input.config || {},
           companyId: input.companyId,
         },
       });
@@ -63,6 +65,7 @@ export const servicesRouter = router({
         name: z.string().min(1).optional(),
         description: z.string().optional(),
         generateMultipleOS: z.boolean().optional(),
+        config: z.any().optional(),
         companyId: z.string().optional(),
       })
     )
