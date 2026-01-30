@@ -1,8 +1,8 @@
 
 import React, { useMemo, useState } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, Legend, LineChart, Line 
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend, LineChart, Line
 } from 'recharts';
 import { Bed, ServiceOrder, User, BedStatus, OSStatus, ServiceType, BedStatusConfig } from '@gestao-leitos/types';
 import { Hash, Bed as BedIcon, Settings, Layers, Clock, CheckCircle2, Circle, PlayCircle, Lock, TrendingUp, Calendar, X, Eye } from 'lucide-react';
@@ -42,25 +42,25 @@ const OS_COLORS = {
 };
 
 const getHexFromTailwind = (className: string) => {
-   if (className.includes('emerald')) return '#10b981';
-   if (className.includes('rose')) return '#f43f5e';
-   if (className.includes('amber')) return '#f59e0b';
-   if (className.includes('slate')) return '#64748b';
-   if (className.includes('sky')) return '#0ea5e9';
-   if (className.includes('blue')) return '#3b82f6';
-   if (className.includes('indigo')) return '#6366f1';
-   if (className.includes('violet')) return '#8b5cf6';
-   if (className.includes('purple')) return '#a855f7';
-   if (className.includes('fuchsia')) return '#d946ef';
-   if (className.includes('pink')) return '#ec4899';
-   if (className.includes('red')) return '#ef4444';
-   if (className.includes('orange')) return '#f97316';
-   if (className.includes('yellow')) return '#eab308';
-   if (className.includes('lime')) return '#84cc16';
-   if (className.includes('green')) return '#22c55e';
-   if (className.includes('teal')) return '#14b8a6';
-   if (className.includes('cyan')) return '#06b6d4';
-   return '#64748b';
+  if (className.includes('emerald')) return '#10b981';
+  if (className.includes('rose')) return '#f43f5e';
+  if (className.includes('amber')) return '#f59e0b';
+  if (className.includes('slate')) return '#64748b';
+  if (className.includes('sky')) return '#0ea5e9';
+  if (className.includes('blue')) return '#3b82f6';
+  if (className.includes('indigo')) return '#6366f1';
+  if (className.includes('violet')) return '#8b5cf6';
+  if (className.includes('purple')) return '#a855f7';
+  if (className.includes('fuchsia')) return '#d946ef';
+  if (className.includes('pink')) return '#ec4899';
+  if (className.includes('red')) return '#ef4444';
+  if (className.includes('orange')) return '#f97316';
+  if (className.includes('yellow')) return '#eab308';
+  if (className.includes('lime')) return '#84cc16';
+  if (className.includes('green')) return '#22c55e';
+  if (className.includes('teal')) return '#14b8a6';
+  if (className.includes('cyan')) return '#06b6d4';
+  return '#64748b';
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, bedStatusConfigs = [] }) => {
@@ -111,10 +111,10 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
       CONCLUIDO: []
     };
 
-    if (!order.history || order.history.length === 0) return tempos;
+    if (!order.history || !Array.isArray(order.history) || order.history.length === 0) return tempos;
 
     // Ordenar histórico por timestamp
-    const sortedHistory = [...order.history].sort((a, b) => 
+    const sortedHistory = [...order.history].sort((a, b) =>
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
@@ -135,7 +135,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
       const current = sortedHistory[i];
       const next = sortedHistory[i + 1];
       const statusDuration = calculateDuration(current.timestamp, next.timestamp);
-      
+
       if (statusDuration > 0) {
         tempos[current.status].push(statusDuration);
       }
@@ -146,7 +146,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
       const lastStatus = sortedHistory[sortedHistory.length - 1];
       const endTime = order.completedAt || new Date().toISOString();
       const lastDuration = calculateDuration(lastStatus.timestamp, endTime);
-      
+
       if (lastDuration > 0 && lastDuration < 999999) { // Evitar valores absurdos
         tempos[lastStatus.status].push(lastDuration);
       }
@@ -185,7 +185,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
 
     return Object.entries(etapaMap)
       .map(([nome, tempos]) => {
-        const calcularMedia = (arr: number[]) => 
+        const calcularMedia = (arr: number[]) =>
           arr.length > 0 ? arr.reduce((sum, d) => sum + d, 0) / arr.length : 0;
 
         const mediaBloqueado = calcularMedia(tempos.tempoMedioBloqueado);
@@ -193,8 +193,8 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
         const mediaEmAndamento = calcularMedia(tempos.tempoMedioEmAndamento);
         const mediaConcluido = calcularMedia(tempos.tempoMedioConcluido);
 
-        const quantidade = tempos.tempoMedioConcluido.length > 0 
-          ? tempos.tempoMedioConcluido.length 
+        const quantidade = tempos.tempoMedioConcluido.length > 0
+          ? tempos.tempoMedioConcluido.length
           : tempos.tempoMedioPendente.length + tempos.tempoMedioBloqueado.length + tempos.tempoMedioEmAndamento.length;
 
         return {
@@ -236,11 +236,11 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
       // Ordenar por step para obter primeira e última ordem
       const sortedGroup = [...group].sort((a, b) => a.step - b.step);
       const firstOrder = sortedGroup[0];
-      
+
       // Encontrar o primeiro momento em que alguma etapa entrou em PENDENTE
       let inicioPendente = firstOrder.requestedAt;
       group.forEach(order => {
-        if (order.history && order.history.length > 0) {
+        if (order.history && Array.isArray(order.history) && order.history.length > 0) {
           const primeiroPendente = order.history
             .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
             .find(h => h.status === 'PENDENTE');
@@ -258,10 +258,10 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
       const ultimaOrdemConcluida = sortedGroup
         .filter(o => o.status === 'CONCLUIDO' && o.completedAt)
         .sort((a, b) => (b.completedAt || '').localeCompare(a.completedAt || ''))[0];
-  
+
       if (ultimaOrdemConcluida?.completedAt) {
         const tempoTotal = calculateDuration(inicioPendente, ultimaOrdemConcluida.completedAt);
-        
+
         if (tempoTotal > 0) {
           // Obter nome do serviço
           const service = services.find(s => s.id === firstOrder.serviceTypeId);
@@ -334,7 +334,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
   // Gráfico de ordens por dia do mês
   const ordensPorDiaMes = useMemo(() => {
     const counts: Record<number, number> = {};
-    
+
     for (let i = 1; i <= 31; i++) {
       counts[i] = 0;
     }
@@ -355,7 +355,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
   const ordensPorMes = useMemo(() => {
     const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const counts: Record<number, number> = {};
-    
+
     for (let i = 0; i < 12; i++) {
       counts[i] = 0;
     }
@@ -374,7 +374,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
 
   const bedStats = useMemo(() => {
     const counts: Record<string, number> = {};
-    
+
     // Inicializar contadores com topos os status configurados ou encontrados
     bedStatusConfigs.forEach(config => {
       counts[config.id] = 0;
@@ -384,17 +384,17 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
       if (!counts[bed.status]) counts[bed.status] = 0;
       counts[bed.status]++;
     });
-    
+
     return Object.entries(counts).map(([id, value]) => {
       const config = bedStatusConfigs.find(c => c.id === id);
-      return { 
-        name: config?.name || id, 
+      return {
+        name: config?.name || id,
         value,
         color: config?.color || 'bg-slate-500', // Classe Tailwind
         // Para Recharts precisamos de Hex. Vamos tentar mapear ou assumir que color pode ser Hex se configurado no futuro, mas o sistema usa classes.
         // Recharts precisa de 'fill'. Se 'color' é classe, não ajuda.
         // Solução: Mapear classes conhecidas para Hex ou usar uma prop separada.
-            // Mapa rápido de cores Tailwind padrão que estamos usando
+        // Mapa rápido de cores Tailwind padrão que estamos usando
         fill: getHexFromTailwind(config?.color || 'bg-slate-500')
       };
     });
@@ -407,12 +407,12 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
       if (!groups[order.groupId]) groups[order.groupId] = [];
       groups[order.groupId].push(order);
     });
-    
+
     return Object.values(groups)
       .map(group => group.sort((a, b) => a.step - b.step))
       .sort((a, b) => new Date(b[0].createdAt).getTime() - new Date(a[0].createdAt).getTime());
   }, [orders]);
-  
+
 
 
   const getStatusIcon = (status: OSStatus) => {
@@ -641,9 +641,9 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#ffffff', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#ffffff',
                     border: '1px solid #e2e8f0',
                     borderRadius: '8px',
                     fontSize: '12px',
@@ -652,33 +652,33 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
                 />
               </PieChart>
             </ResponsiveContainer>
-             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-               <div className="text-center">
-                 <span className="text-3xl font-black text-slate-800 block">{beds.length}</span>
-                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Leitos</span>
-               </div>
-             </div>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="text-center">
+                <span className="text-3xl font-black text-slate-800 block">{beds.length}</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Leitos</span>
+              </div>
+            </div>
           </div>
         </div>
 
         <div className="lg:col-span-2 bg-white p-4 md:p-6 border border-slate-200 rounded-2xl md:rounded-3xl shadow-sm">
-           <h4 className="text-[10px] font-black text-slate-800 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
-             <Hash size={14} className="text-sky-500" /> Detalhes por Status
-           </h4>
-           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {bedStatusConfigs.filter(cfg => bedStats.some(s => s.name === cfg.name)).map(config => {
-                  const stat = bedStats.find(s => s.name === config.name);
-                  return (
-                    <div key={config.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-between group hover:border-sky-100 transition-colors">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${config.color} ring-2 ring-white shadow-sm`}></div>
-                        <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-sky-600 transition-colors">{config.name}</span>
-                      </div>
-                      <span className="font-black text-lg text-slate-800">{stat?.value || 0}</span>
-                    </div>
-                  );
-                })}
-           </div>
+          <h4 className="text-[10px] font-black text-slate-800 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
+            <Hash size={14} className="text-sky-500" /> Detalhes por Status
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {bedStatusConfigs.filter(cfg => bedStats.some(s => s.name === cfg.name)).map(config => {
+              const stat = bedStats.find(s => s.name === config.name);
+              return (
+                <div key={config.id} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center justify-between group hover:border-sky-100 transition-colors">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-3 h-3 rounded-full ${config.color} ring-2 ring-white shadow-sm`}></div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase group-hover:text-sky-600 transition-colors">{config.name}</span>
+                  </div>
+                  <span className="font-black text-lg text-slate-800">{stat?.value || 0}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -693,18 +693,18 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={ordensPorDiaSemana}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="dia" 
+                <XAxis
+                  dataKey="dia"
                   tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }}
                   stroke="#cbd5e1"
                 />
-                <YAxis 
+                <YAxis
                   tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }}
                   stroke="#cbd5e1"
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#ffffff', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#ffffff',
                     border: '1px solid #e2e8f0',
                     borderRadius: '8px',
                     fontSize: '12px',
@@ -726,29 +726,29 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={ordensPorDiaMes}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="dia" 
+                <XAxis
+                  dataKey="dia"
                   tick={{ fontSize: 9, fill: '#64748b', fontWeight: 'bold' }}
                   stroke="#cbd5e1"
                   interval={4}
                 />
-                <YAxis 
+                <YAxis
                   tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }}
                   stroke="#cbd5e1"
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#ffffff', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#ffffff',
                     border: '1px solid #e2e8f0',
                     borderRadius: '8px',
                     fontSize: '12px',
                     fontWeight: 'bold'
                   }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="quantidade" 
-                  stroke="#38bdf8" 
+                <Line
+                  type="monotone"
+                  dataKey="quantidade"
+                  stroke="#38bdf8"
                   strokeWidth={2}
                   dot={{ fill: '#38bdf8', r: 3 }}
                   activeDot={{ r: 5 }}
@@ -767,18 +767,18 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={ordensPorMes}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis 
-                  dataKey="mes" 
+                <XAxis
+                  dataKey="mes"
                   tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }}
                   stroke="#cbd5e1"
                 />
-                <YAxis 
+                <YAxis
                   tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }}
                   stroke="#cbd5e1"
                 />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#ffffff', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#ffffff',
                     border: '1px solid #e2e8f0',
                     borderRadius: '8px',
                     fontSize: '12px',
@@ -821,7 +821,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
                   const firstOrder = group[0];
                   const bed = beds.find(b => b.id === firstOrder.bedId);
                   const service = services.find(s => s.id === firstOrder.serviceId);
-                  
+
                   return (
                     <tr key={firstOrder.groupId} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-4 md:px-8 py-4 md:py-6">
@@ -832,8 +832,8 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
                       <td className="px-4 md:px-8 py-4 md:py-6">
                         <div className="flex items-center gap-2">
                           {(() => {
-                             const config = bedStatusConfigs?.find(c => c.id === bed?.status);
-                             return <div className={`w-2 h-2 rounded-full ${config?.color || 'bg-slate-400'}`} />;
+                            const config = bedStatusConfigs?.find(c => c.id === bed?.status);
+                            return <div className={`w-2 h-2 rounded-full ${config?.color || 'bg-slate-400'}`} />;
                           })()}
                           <span className="text-[10px] md:text-xs font-black text-slate-700 uppercase">{bed?.name || 'N/A'}</span>
                         </div>
@@ -850,13 +850,12 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
                         <div className="flex items-center gap-1 flex-wrap">
                           {group.map((order, idx) => (
                             <div key={order.id} className="flex items-center">
-                              <div 
-                                className={`flex items-center gap-1 px-1.5 md:gap-1.5 md:px-2 py-1 rounded-md border text-[8px] md:text-[9px] font-black uppercase transition-all ${
-                                  order.status === 'CONCLUIDO' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
+                              <div
+                                className={`flex items-center gap-1 px-1.5 md:gap-1.5 md:px-2 py-1 rounded-md border text-[8px] md:text-[9px] font-black uppercase transition-all ${order.status === 'CONCLUIDO' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
                                   order.status === 'EM_ANDAMENTO' ? 'bg-sky-50 border-sky-100 text-sky-600 ring-2 ring-sky-50' :
-                                  order.status === 'PENDENTE' ? 'bg-amber-50 border-amber-100 text-amber-600' :
-                                  'bg-slate-50 border-slate-100 text-slate-300 opacity-60'
-                                }`}
+                                    order.status === 'PENDENTE' ? 'bg-amber-50 border-amber-100 text-amber-600' :
+                                      'bg-slate-50 border-slate-100 text-slate-300 opacity-60'
+                                  }`}
                                 title={`${order.subServiceName}: ${order.status}`}
                               >
                                 {getStatusIcon(order.status)}
@@ -885,7 +884,7 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
               </tbody>
             </table>
           </div>
-          
+
           {orderGroups.length > 0 && (
             <div className="mt-auto pt-4 md:pt-6 border-t border-slate-50 text-center">
               <p className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-widest">
