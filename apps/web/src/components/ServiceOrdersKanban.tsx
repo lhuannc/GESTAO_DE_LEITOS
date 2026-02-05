@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { ServiceOrder, ServiceType, ActionStatus, Bed, User, OSStatus, Team, Sector, BedStatusConfig } from '@gestao-leitos/types';
-import { 
-  ChevronRight, 
-  User as UserIcon, 
-  MapPin, 
+import {
+  ChevronRight,
+  User as UserIcon,
+  MapPin,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -65,9 +65,9 @@ const formatDuration = (ms: number): string => {
   return parts.join(' ');
 };
 
-const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({ 
-  orders, 
-  services, 
+const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
+  orders,
+  services,
   beds,
   sectors,
   currentUser,
@@ -113,13 +113,13 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   }, [editingOrder]);
 
   // Equipes que o usuário atual faz parte
-  const currentUserTeams = useMemo(() => 
+  const currentUserTeams = useMemo(() =>
     teams.filter(t => t.userIds.includes(currentUser.id)).map(t => t.id),
-  [teams, currentUser.id]);
+    [teams, currentUser.id]);
 
   const visibleOrders = useMemo(() => {
     if (currentUser.permissions.isAdmin) return orders;
-    return orders.filter(order => 
+    return orders.filter(order =>
       !order.assignedToTeamId || currentUserTeams.includes(order.assignedToTeamId)
     );
   }, [orders, currentUser.permissions.isAdmin, currentUserTeams]);
@@ -138,7 +138,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
       const sector = bed ? sectorsMap.get(bed.sectorId) : undefined;
       const team = order.assignedToTeamId ? teamsMap.get(order.assignedToTeamId) : undefined;
       const responsibleName = order.assignedToUserId ? usersMap.get(order.assignedToUserId)?.name : undefined;
-      
+
       return {
         order,
         bed,
@@ -158,15 +158,15 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   // Retorna LISTA de bloqueadores (pode ser sequencial ou explícito)
   const getBlockerOrders = (order: ServiceOrder): ServiceOrder[] => {
     if (order.status !== 'BLOQUEADO') return [];
-    
+
     // Se tiver dependências explícitas
     if (order.dependsOnOrderIds && order.dependsOnOrderIds.length > 0) {
-      return orders.filter(o => 
-        order.dependsOnOrderIds?.includes(o.id) && 
+      return orders.filter(o =>
+        order.dependsOnOrderIds?.includes(o.id) &&
         o.status !== 'CONCLUIDO'
       );
     }
-    
+
     return [];
   };
 
@@ -181,9 +181,9 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
 
   const handleQRScan = async (scannedData: string) => {
     if (!editingOrder) return;
-    
-    const scannedUser = users.find(u => 
-      u.id === scannedData || 
+
+    const scannedUser = users.find(u =>
+      u.id === scannedData ||
       u.cpfHash === scannedData ||
       u.login === scannedData ||
       u.cpf === scannedData
@@ -196,7 +196,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
     } else {
       const newAttempts = qrScanAttempts + 1;
       setQrScanAttempts(newAttempts);
-      
+
       if (newAttempts >= 2) {
         setShowLoginFallback(true);
         setShowQRScanner(false);
@@ -276,11 +276,12 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
 
   const getDurations = (order: ServiceOrder) => {
     const statusTimes: Record<string, number> = { BLOQUEADO: 0, PENDENTE: 0, EM_ANDAMENTO: 0, CONCLUIDO: 0 };
+    if (!order.history || !Array.isArray(order.history)) return { statusTimes, totalTime: 0, history: [] };
     const history = [...order.history].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     for (let i = 0; i < history.length; i++) {
       const start = new Date(history[i].timestamp).getTime();
-      const end = i < history.length - 1 
-        ? new Date(history[i+1].timestamp).getTime() 
+      const end = i < history.length - 1
+        ? new Date(history[i + 1].timestamp).getTime()
         : (order.status === 'CONCLUIDO' ? new Date(order.finishedAt!).getTime() : now);
       statusTimes[history[i].status] += (end - start);
     }
@@ -293,7 +294,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   };
 
   const toggleItemConfirmation = (itemId: string) => {
-    setConfirmedItemIds(prev => 
+    setConfirmedItemIds(prev =>
       prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
     );
   };
@@ -320,9 +321,9 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
               {kanbanItems
                 .filter(item => item.order.status === col.id)
                 .map(item => (
-                  <KanbanCard 
-                    key={item.order.id} 
-                    order={item.order} 
+                  <KanbanCard
+                    key={item.order.id}
+                    order={item.order}
                     currentUser={currentUser}
                     team={item.team}
                     bed={item.bed}
@@ -333,7 +334,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                       setEditingOrder(item.order);
                       setIsConfirmingItems(false);
                       setConfirmationType(null);
-                    }} 
+                    }}
                   />
                 ))
               }
@@ -345,16 +346,16 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
       {editingOrder && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-50 p-2 md:p-4">
           <div className="bg-white rounded-2xl md:rounded-3xl shadow-2xl max-w-5xl w-full overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col lg:flex-row h-[95vh] md:h-[90vh] lg:h-auto">
-            
+
             <div className="bg-slate-900 lg:w-80 text-white p-4 md:p-6 lg:p-8 flex flex-col shrink-0 overflow-y-auto">
               <div className="flex justify-between items-start mb-6">
                 <span className="bg-sky-500 text-[10px] font-black uppercase px-2 py-0.5 rounded flex items-center gap-1">
                   <Hash size={10} /> {editingOrder.id.slice(-6)}
                 </span>
               </div>
-              
+
               <h4 className="text-2xl font-black mb-1 leading-tight">{editingOrder.subServiceName || services.find(s => s.id === editingOrder.serviceTypeId)?.name}</h4>
-              <p className="text-sky-400 font-bold text-sm flex items-center gap-2"><MapPin size={14}/> {beds.find(b => b.id === editingOrder.bedId)?.name}</p>
+              <p className="text-sky-400 font-bold text-sm flex items-center gap-2"><MapPin size={14} /> {beds.find(b => b.id === editingOrder.bedId)?.name}</p>
               <p className="text-sky-300/60 font-bold text-xs mb-6 ml-5">{(() => {
                 const bed = beds.find(b => b.id === editingOrder.bedId);
                 const sector = bed ? sectors.find(s => s.id === bed.sectorId) : null;
@@ -371,28 +372,28 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                 </div>
 
                 {blockerOrders.length > 0 && (
-                   <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl">
-                      <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                        <Lock size={12} /> Status: Bloqueado
-                      </p>
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-bold text-white mb-1">Aguardando a conclusão de:</p>
-                        {blockerOrders.map(b => {
-                           const bBed = beds.find(bed => bed.id === b.bedId);
-                           const bSector = bBed ? sectors.find(s => s.id === bBed.sectorId) : null;
-                           const bActionName = b.subServiceName;
-                           
-                           return (
-                             <div key={b.id} className="text-[11px] text-rose-300 font-bold bg-rose-500/10 p-2 rounded border border-rose-500/20">
-                               <span className="uppercase">{bActionName}</span>
-                               <span className="block text-[9px] text-rose-400/80 mt-0.5">
-                                 {bBed?.name || 'Leito N/A'} / {bSector?.name || 'Setor N/A'}
-                               </span>
-                             </div>
-                           );
-                        })}
-                      </div>
-                   </div>
+                  <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-2xl">
+                    <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                      <Lock size={12} /> Status: Bloqueado
+                    </p>
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold text-white mb-1">Aguardando a conclusão de:</p>
+                      {blockerOrders.map(b => {
+                        const bBed = beds.find(bed => bed.id === b.bedId);
+                        const bSector = bBed ? sectors.find(s => s.id === bBed.sectorId) : null;
+                        const bActionName = b.subServiceName;
+
+                        return (
+                          <div key={b.id} className="text-[11px] text-rose-300 font-bold bg-rose-500/10 p-2 rounded border border-rose-500/20">
+                            <span className="uppercase">{bActionName}</span>
+                            <span className="block text-[9px] text-rose-400/80 mt-0.5">
+                              {bBed?.name || 'Leito N/A'} / {bSector?.name || 'Setor N/A'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
 
 
@@ -437,40 +438,40 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                         <p className="text-xs text-slate-500 font-medium">Confirme fisicamente os itens para prosseguir.</p>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-3">
                       {(editingOrder.items || []).map((it, idx) => (
-                        <div 
-                          key={idx} 
+                        <div
+                          key={idx}
                           onClick={() => toggleItemConfirmation(it.itemId)}
                           className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${confirmedItemIds.includes(it.itemId) ? 'border-emerald-500 bg-emerald-50/50 shadow-sm' : 'border-slate-100 hover:border-slate-200 bg-slate-50/30'}`}
                         >
                           <div className="flex items-center gap-4">
-                             <div className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all ${confirmedItemIds.includes(it.itemId) ? 'bg-emerald-500 text-white' : 'bg-white text-slate-200 border border-slate-200'}`}>
-                               <CheckCircle size={18} />
-                             </div>
-                             <div>
-                                <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{it.name}</p>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Qtd Solicitada: {it.quantity}</p>
-                             </div>
+                            <div className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all ${confirmedItemIds.includes(it.itemId) ? 'bg-emerald-500 text-white' : 'bg-white text-slate-200 border border-slate-200'}`}>
+                              <CheckCircle size={18} />
+                            </div>
+                            <div>
+                              <p className="text-sm font-black text-slate-800 uppercase tracking-tight">{it.name}</p>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Qtd Solicitada: {it.quantity}</p>
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
 
                     <div className="mt-8 flex gap-3">
-                      <button 
+                      <button
                         onClick={() => { setIsConfirmingItems(false); setConfirmationType(null); }}
                         className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-slate-200"
                       >
                         Voltar
                       </button>
-                      <button 
+                      <button
                         disabled={!allItemsConfirmed}
                         onClick={confirmationType === 'ASSIGN' ? handleConfirmAssign : handleConfirmComplete}
                         className={`flex-1 py-4 font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-xl flex items-center justify-center gap-2 ${allItemsConfirmed ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                       >
-                        <FileCheck size={18} /> 
+                        <FileCheck size={18} />
                         <span>{confirmationType === 'ASSIGN' ? 'Confirmar e Iniciar' : 'Confirmar e Concluir'}</span>
                       </button>
                     </div>
@@ -478,30 +479,30 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                 ) : (
                   <>
                     <div>
-                       <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center space-x-2">
-                         <Package size={16} className="text-sky-500" /> <span>Checklist de Insumos</span>
-                       </h5>
-                       <div className="bg-slate-50/50 rounded-2xl border border-slate-100 overflow-hidden">
-                          <table className="w-full text-left">
-                            <thead className="bg-slate-100 text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                               <tr>
-                                  <th className="px-6 py-4">Insumo</th>
-                                  <th className="px-6 py-4 text-center">Quantidade</th>
-                               </tr>
-                            </thead>
-                            <tbody className="text-xs">
-                               {(editingOrder.items || []).map((it, idx) => (
-                                 <tr key={idx} className="border-t border-slate-100 hover:bg-white transition-colors">
-                                    <td className="px-6 py-4 font-bold text-slate-700 uppercase text-[10px]">{it.name}</td>
-                                    <td className="px-6 py-4 text-center font-black text-slate-500">{it.quantity}</td>
-                                 </tr>
-                               ))}
-                               {(!editingOrder.items || editingOrder.items.length === 0) && (
-                                 <tr><td colSpan={2} className="px-6 py-8 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">Nenhum item associado à OS</td></tr>
-                               )}
-                            </tbody>
-                          </table>
-                       </div>
+                      <h5 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center space-x-2">
+                        <Package size={16} className="text-sky-500" /> <span>Checklist de Insumos</span>
+                      </h5>
+                      <div className="bg-slate-50/50 rounded-2xl border border-slate-100 overflow-hidden">
+                        <table className="w-full text-left">
+                          <thead className="bg-slate-100 text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                            <tr>
+                              <th className="px-6 py-4">Insumo</th>
+                              <th className="px-6 py-4 text-center">Quantidade</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-xs">
+                            {(editingOrder.items || []).map((it, idx) => (
+                              <tr key={idx} className="border-t border-slate-100 hover:bg-white transition-colors">
+                                <td className="px-6 py-4 font-bold text-slate-700 uppercase text-[10px]">{it.name}</td>
+                                <td className="px-6 py-4 text-center font-black text-slate-500">{it.quantity}</td>
+                              </tr>
+                            ))}
+                            {(!editingOrder.items || editingOrder.items.length === 0) && (
+                              <tr><td colSpan={2} className="px-6 py-8 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest">Nenhum item associado à OS</td></tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
 
                     <div>
@@ -510,27 +511,26 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                       </h5>
                       <div className="space-y-6">
                         {getDurations(editingOrder).history.map((h, i, arr) => {
-                          const prevTime = i === 0 ? new Date(editingOrder.requestedAt).getTime() : new Date(arr[i-1].timestamp).getTime();
+                          const prevTime = i === 0 ? new Date(editingOrder.requestedAt).getTime() : new Date(arr[i - 1].timestamp).getTime();
                           const diff = new Date(h.timestamp).getTime() - prevTime;
                           const isTooFast = diff < 60000 && diff > 0 && h.status === 'CONCLUIDO';
-                          
+
                           return (
                             <div key={i} className="relative pl-8 pb-4 border-l-2 border-slate-100 ml-2">
-                              <div className={`absolute left-[-9px] top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 ${
-                                h.status === 'CONCLUIDO' ? 'bg-emerald-500' : 
-                                h.status === 'EM_ANDAMENTO' ? 'bg-sky-500' : 'bg-amber-500'
-                              }`} />
+                              <div className={`absolute left-[-9px] top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 ${h.status === 'CONCLUIDO' ? 'bg-emerald-500' :
+                                  h.status === 'EM_ANDAMENTO' ? 'bg-sky-500' : 'bg-amber-500'
+                                }`} />
                               <div className="flex flex-col">
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider">{h.status.replace('_', ' ')}</span>
                                   <div className="flex items-center gap-2">
-                                     {i > 0 && (
-                                       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm ${isTooFast ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>
-                                         {isTooFast && <Timer size={10} className="animate-pulse" />}
-                                         +{formatDuration(diff)}
-                                       </span>
-                                     )}
-                                     <span className="text-[10px] font-bold text-slate-400">{new Date(h.timestamp).toLocaleTimeString()}</span>
+                                    {i > 0 && (
+                                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm ${isTooFast ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>
+                                        {isTooFast && <Timer size={10} className="animate-pulse" />}
+                                        +{formatDuration(diff)}
+                                      </span>
+                                    )}
+                                    <span className="text-[10px] font-bold text-slate-400">{new Date(h.timestamp).toLocaleTimeString()}</span>
                                   </div>
                                 </div>
                                 <p className="text-xs text-slate-500 font-medium">{h.note || 'Evento de sistema'}</p>
@@ -548,14 +548,14 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                 <div className="pt-6 border-t border-slate-100 space-y-3">
                   <div className="flex gap-3">
                     {editingOrder.status === 'BLOQUEADO' ? (
-                      <button 
+                      <button
                         onClick={() => setEditingOrder(null)}
                         className="flex-1 bg-slate-900 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-black transition-all"
                       >
                         <Lock size={18} /> <span>Tarefa Bloqueada - Fechar</span>
                       </button>
                     ) : editingOrder.status === 'CONCLUIDO' ? (
-                       <button 
+                      <button
                         onClick={() => setEditingOrder(null)}
                         className="flex-1 bg-slate-900 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-2 hover:bg-black transition-all"
                       >
@@ -564,7 +564,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                     ) : isMemberOfResponsibleTeam(editingOrder) ? (
                       <div className="flex flex-1 gap-3">
                         {!editingOrder.assignedToUserId ? (
-                          <button 
+                          <button
                             onClick={handleRequestAssign}
                             className="flex-1 bg-amber-500 hover:bg-amber-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center space-x-2 shadow-lg transition-all active:scale-95"
                           >
@@ -572,16 +572,16 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                           </button>
                         ) : (
                           <>
-                             {editingOrder.status === 'PENDENTE' && (
-                                <button onClick={handleRequestAssign} className="flex-1 bg-sky-600 hover:bg-sky-700 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center space-x-2 shadow-lg transition-all active:scale-95">
-                                  <Play size={18} /> <span>Retomar Trabalho</span>
-                                </button>
-                             )}
-                             {editingOrder.status === 'EM_ANDAMENTO' && (
-                                <button onClick={handleRequestComplete} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center space-x-2 shadow-lg transition-all active:scale-95">
-                                  <CheckCircle size={18} /> <span>Finalizar Ação</span>
-                                </button>
-                             )}
+                            {editingOrder.status === 'PENDENTE' && (
+                              <button onClick={handleRequestAssign} className="flex-1 bg-sky-600 hover:bg-sky-700 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center space-x-2 shadow-lg transition-all active:scale-95">
+                                <Play size={18} /> <span>Retomar Trabalho</span>
+                              </button>
+                            )}
+                            {editingOrder.status === 'EM_ANDAMENTO' && (
+                              <button onClick={handleRequestComplete} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center space-x-2 shadow-lg transition-all active:scale-95">
+                                <CheckCircle size={18} /> <span>Finalizar Ação</span>
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -590,8 +590,8 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Executor sem permissão</p>
                       </div>
                     )}
-                    
-                    <button 
+
+                    <button
                       onClick={() => setEditingOrder(null)}
                       className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-6 rounded-2xl font-black uppercase text-[10px] transition-all"
                     >
@@ -600,7 +600,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                   </div>
 
                   {editingOrder.assignedToUserId && currentUser.permissions.isAdmin && editingOrder.status !== 'CONCLUIDO' && (
-                    <button 
+                    <button
                       onClick={handleUnassign}
                       className="w-full bg-rose-50 text-rose-500 py-3 rounded-2xl hover:bg-rose-100 transition-all text-[10px] font-black uppercase tracking-widest border border-rose-100 flex items-center justify-center gap-2"
                     >
@@ -625,12 +625,12 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
           }}
           onError={(error) => {
             // Ignorar erros de play interrompido (comuns em React StrictMode)
-            if (error.includes('play() request was interrupted') || 
-                error.includes('media was removed from the document')) {
+            if (error.includes('play() request was interrupted') ||
+              error.includes('media was removed from the document')) {
               console.debug('Erro de play ignorado (comum em desenvolvimento):', error);
               return;
             }
-            
+
             console.error('Erro no scanner:', error);
             setQrScanAttempts(prev => {
               const newAttempts = prev + 1;
@@ -661,7 +661,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
               <p className="text-sm text-slate-600 font-medium">
                 O scanner de QR code falhou. Por favor, insira suas credenciais para continuar:
               </p>
-              
+
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
                   Login
@@ -736,7 +736,7 @@ const KanbanCard: React.FC<{ order: ServiceOrder; bed: Bed | undefined; sector: 
           <Lock size={12} />
         </div>
       )}
-      
+
       <div className="flex justify-between items-start mb-2 mt-2">
         <div className="overflow-hidden pr-2">
           <h5 className="text-lg font-black text-slate-800 leading-none truncate">{bed?.name}</h5>
@@ -744,15 +744,15 @@ const KanbanCard: React.FC<{ order: ServiceOrder; bed: Bed | undefined; sector: 
         </div>
         <div className={`w-2 h-2 rounded-full shrink-0 ${order.status === 'BLOQUEADO' ? 'bg-slate-300' : order.status === 'EM_ANDAMENTO' ? 'bg-sky-500 animate-pulse' : order.status === 'CONCLUIDO' ? 'bg-emerald-500' : 'bg-amber-400'}`} />
       </div>
-      
+
       <div className="flex-1 space-y-2">
         <p className="text-[11px] font-black text-slate-500 uppercase tracking-tight truncate">{order.subServiceName || 'Atendimento Geral'}</p>
-        
+
         {order.status === 'BLOQUEADO' && blockerStepName && (
-           <div className="flex items-center gap-1.5 text-[9px] font-black text-rose-400 bg-rose-50 px-2 py-1 rounded-lg uppercase tracking-tighter">
-              <ShieldAlert size={10} />
-              <span className="truncate">Aguardando: {blockerStepName}</span>
-           </div>
+          <div className="flex items-center gap-1.5 text-[9px] font-black text-rose-400 bg-rose-50 px-2 py-1 rounded-lg uppercase tracking-tighter">
+            <ShieldAlert size={10} />
+            <span className="truncate">Aguardando: {blockerStepName}</span>
+          </div>
         )}
 
         <div className="flex flex-wrap gap-2">
@@ -762,19 +762,19 @@ const KanbanCard: React.FC<{ order: ServiceOrder; bed: Bed | undefined; sector: 
 
       <div className="mt-auto flex items-center justify-between pt-3 border-t border-slate-50">
         <div className="flex items-center gap-2">
-           <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm border ${responsibleName ? 'bg-sky-500 border-sky-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
-              {responsibleName ? (
-                <span className="text-[10px] font-black">{responsibleName.charAt(0)}</span>
-              ) : (
-                <SilhouetteIcon size={14} />
-              )}
-           </div>
-           <div className="flex flex-col">
-              <div className="flex items-center space-x-1 text-[9px] text-slate-400 font-black uppercase">
-                <Clock size={10} />
-                <span>{totalTime}</span>
-              </div>
-           </div>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm border ${responsibleName ? 'bg-sky-500 border-sky-600 text-white' : 'bg-slate-50 border-slate-100 text-slate-300'}`}>
+            {responsibleName ? (
+              <span className="text-[10px] font-black">{responsibleName.charAt(0)}</span>
+            ) : (
+              <SilhouetteIcon size={14} />
+            )}
+          </div>
+          <div className="flex flex-col">
+            <div className="flex items-center space-x-1 text-[9px] text-slate-400 font-black uppercase">
+              <Clock size={10} />
+              <span>{totalTime}</span>
+            </div>
+          </div>
         </div>
         <ChevronRight size={14} className="text-slate-300 group-hover:text-sky-500 group-hover:translate-x-1 transition-all" />
       </div>

@@ -172,6 +172,9 @@ model ServiceOrder {
   assignedToTeam Team?       @relation("assignedToTeam", fields: [assignedToTeamId], references: [id])
   assignedToUser User?       @relation("assignedToUser", fields: [assignedToUserId], references: [id])
   actions        Action[]
+  orderHistory   OrderHistory[]
+  dependencies   OrderDependency[] @relation("BlockedOrder")
+  blocking       OrderDependency[] @relation("BlockingOrder")
 
   @@index([groupId])
   @@index([bedId])
@@ -218,6 +221,35 @@ model Action {
 }
 
 // HISTORY & AUDIT
+model OrderHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  status    OrderStatus
+  note      String?
+  userId    String?
+  timestamp DateTime    @default(now())
+  createdAt DateTime    @default(now())
+
+  order ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@map("order_history")
+}
+
+model OrderDependency {
+  id          String   @id @default(cuid())
+  orderId     String
+  dependsOnId String
+  type        String   @default("BLOQUEIO")
+  createdAt   DateTime @default(now())
+
+  order     ServiceOrder @relation("BlockedOrder", fields: [orderId], references: [id], onDelete: Cascade)
+  dependsOn ServiceOrder @relation("BlockingOrder", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([dependsOnId])
+  @@map("order_dependencies")
+}
 model BedHistory {
   id        String    @id @default(cuid())
   bedId     String

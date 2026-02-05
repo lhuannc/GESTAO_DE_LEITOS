@@ -3,25 +3,23 @@ import { router, protectedProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
 
 // Helper to check if all dependencies are met
+// Helper to check if all dependencies are met
 const checkDependencies = async (ctx: any, orderId: string, ignoreOrderIds: string[] = []) => {
-  const order = await ctx.prisma.serviceOrder.findUnique({
-    where: { id: orderId },
-    select: { dependsOnOrderIds: true }
-  });
-
-  if (!order || !order.dependsOnOrderIds || order.dependsOnOrderIds.length === 0) return true;
-
-  const dependencies = await ctx.prisma.serviceOrder.findMany({
+  const dependencies = await ctx.prisma.orderDependency.findMany({
     where: {
-      id: { in: order.dependsOnOrderIds }
+      orderId: orderId
     },
-    select: { id: true, status: true }
+    include: {
+      dependsOn: { select: { id: true, status: true } }
+    }
   });
+
+  if (dependencies.length === 0) return true;
 
   // Check if ALL dependencies are CONCLUIDO (ignoring specific IDs that are currently being completed)
-  return dependencies.every((d: { id: string; status: string }) => {
-    if (ignoreOrderIds.includes(d.id)) return true; // Treat ignored ones as effectively "done" for this check
-    return d.status === 'CONCLUIDO';
+  return dependencies.every((d: any) => {
+    if (ignoreOrderIds.includes(d.dependsOn.id)) return true; // Treat ignored ones as effectively "done" for this check
+    return d.dependsOn.status === 'CONCLUIDO';
   });
 };
 
@@ -68,6 +66,12 @@ export const ordersRouter = router({
           requestedBy: true,
           assignedToTeam: true,
           assignedToUser: true,
+          orderHistory: true,
+          dependencies: {
+            include: {
+              dependsOn: true
+            }
+          }
         },
         orderBy: {
           createdAt: 'desc',
@@ -75,6 +79,9 @@ export const ordersRouter = router({
         take: input?.limit ?? 50,
       });
 
+      // Map to frontend expectation (if needed, but frontend updates should handle it)
+      // For compatibility during transition, we can map orderHistory to history if we wanted.
+      // But we will update frontend to use orderHistory.
       return orders;
     }),
 
@@ -168,37 +175,68 @@ export const ordersRouter = router({
             notes: input.notes,
             requestedById: ctx.userId!,
             assignedToTeamId: stepConfig.targetTeamId,
-            dependsOnOrderIds: dependsOn,
             items: stepInput.items,
-            history: [
-              {
+            orderHistory: {
+              create: {
                 status: initialStatus,
-                userId: ctx.userId!,
-                timestamp: new Date().toISOString(),
                 note: isFirst ? 'Ordem criada' : 'Aguardando etapa anterior',
               }
-            ],
+            }
           },
         });
+
+        // Create Dependencies
+
+        // 1. Sequential Dependency (Previous step)
+        if (!isFirst) {
+          await ctx.prisma.orderDependency.create({
+            data: {
+              orderId: order.id,
+              dependsOnId: createdOrderIds[i - 1],
+              type: 'SEQUENCIAL'
+            }
+          });
+        }
+
+        // 2. Explicit Dependency (Input - BLOQUEADA)
+        if (stepInput.dependency && stepInput.dependency.bedId) {
+          const dep = stepInput.dependency;
+          if (dep.type === 'BLOQUEADA' && dep.actionId) {
+            await ctx.prisma.orderDependency.create({
+              data: {
+                orderId: order.id,
+                dependsOnId: dep.actionId,
+                type: 'BLOQUEIO'
+              }
+            });
+          }
+        }
 
         // Handle 'BLOQUEADOR' type - The new order BLOCKS an existing order
         if (stepInput.dependency && stepInput.dependency.type === 'BLOQUEADOR' && stepInput.dependency.actionId) {
           // We need to update the TARGET order to depend on THIS new order
+
+          await ctx.prisma.orderDependency.create({
+            data: {
+              orderId: stepInput.dependency.actionId, // The existing order becomes blocked
+              dependsOnId: order.id, // Depends on the new order
+              type: 'BLOQUEIO'
+            }
+          });
+
+          // Update status of the blocked order
           await ctx.prisma.serviceOrder.update({
             where: { id: stepInput.dependency.actionId },
             data: {
               status: 'BLOQUEADO',
-              dependsOnOrderIds: {
-                push: order.id
-              },
-              history: {
-                push: {
-                  status: 'BLOQUEADO',
-                  userId: ctx.userId!,
-                  timestamp: new Date().toISOString(),
-                  note: `Bloqueado por nova solicitação: ${stepConfig.name || 'Geral'}`,
-                }
-              }
+            }
+          });
+
+          await ctx.prisma.orderHistory.create({
+            data: {
+              orderId: stepInput.dependency.actionId,
+              status: 'BLOQUEADO',
+              note: `Bloqueado por nova solicitação: ${stepConfig.name || 'Geral'}`
             }
           });
         }
@@ -255,13 +293,12 @@ export const ordersRouter = router({
         data: {
           status: input.status,
           ...(input.status === 'CONCLUIDO' && { completedAt: new Date() }),
-          history: {
-            push: {
+          orderHistory: {
+            create: {
               status: input.status,
-              userId: ctx.userId!,
-              timestamp: new Date().toISOString(),
-            },
-          },
+              note: input.status === 'CONCLUIDO' ? 'Concluído' : undefined
+            }
+          }
         },
       });
 
@@ -309,46 +346,43 @@ export const ordersRouter = router({
               where: { id: nextOrder.id },
               data: {
                 status: 'PENDENTE',
-                history: {
-                  push: {
+                orderHistory: {
+                  create: {
                     status: 'PENDENTE',
-                    userId: 'system',
-                    timestamp: new Date().toISOString(),
-                    note: 'Liberado automaticamente após conclusão da etapa anterior',
-                  },
-                },
+                    note: 'Liberado automaticamente após conclusão da etapa anterior'
+                  }
+                }
               },
             });
           }
         }
 
         // 2. Release other orders that depend on this one (Explicit Dependencies)
-        const dependentOrders = await ctx.prisma.serviceOrder.findMany({
+        // Find orders that depend on this orderId
+        const dependentRelations = await ctx.prisma.orderDependency.findMany({
           where: {
-            dependsOnOrderIds: {
-              has: order.id
-            },
-            status: 'BLOQUEADO'
-          }
+            dependsOnId: order.id
+          },
+          include: { order: true }
         });
 
-        for (const depOrder of dependentOrders) {
-          const canRelease = await checkDependencies(ctx, depOrder.id, [order.id]);
-          if (canRelease) {
-            await ctx.prisma.serviceOrder.update({
-              where: { id: depOrder.id },
-              data: {
-                status: 'PENDENTE',
-                history: {
-                  push: {
-                    status: 'PENDENTE',
-                    userId: 'system',
-                    timestamp: new Date().toISOString(),
-                    note: `Liberado automaticamente: Dependência ${order.subServiceName} (ID: ${order.id.slice(-6)}) concluída`,
-                  },
+        for (const rel of dependentRelations) {
+          if (rel.order.status === 'BLOQUEADO') {
+            const canRelease = await checkDependencies(ctx, rel.order.id, [order.id]);
+            if (canRelease) {
+              await ctx.prisma.serviceOrder.update({
+                where: { id: rel.order.id },
+                data: {
+                  status: 'PENDENTE',
+                  orderHistory: {
+                    create: {
+                      status: 'PENDENTE',
+                      note: `Liberado automaticamente: Dependência ${order.subServiceName} concluída`
+                    }
+                  }
                 },
-              },
-            });
+              });
+            }
           }
         }
       }
@@ -378,14 +412,12 @@ export const ordersRouter = router({
         data: {
           assignedToUserId: ctx.userId!,
           status: 'EM_ANDAMENTO',
-          history: {
-            push: {
+          orderHistory: {
+            create: {
               status: 'EM_ANDAMENTO',
-              userId: ctx.userId!,
-              timestamp: new Date().toISOString(),
-              note: 'Atribuído via Kanban',
-            },
-          },
+              note: 'Atribuído via Kanban'
+            }
+          }
         },
       });
 
@@ -414,14 +446,12 @@ export const ordersRouter = router({
         data: {
           assignedToUserId: null,
           status: 'PENDENTE',
-          history: {
-            push: {
+          orderHistory: {
+            create: {
               status: 'PENDENTE',
-              userId: ctx.userId!,
-              timestamp: new Date().toISOString(),
-              note: 'Responsável removido',
-            },
-          },
+              note: 'Responsável removido'
+            }
+          }
         },
       });
 

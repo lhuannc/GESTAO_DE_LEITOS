@@ -18,7 +18,7 @@ interface ProcessedAction {
   flowStatus: string;
   flowRequestDate: string;
   flowCompletionDate: string;
-  
+
   // Action info
   actionId: string;
   actionName: string;
@@ -27,7 +27,7 @@ interface ProcessedAction {
   bed: string;
   requesterUser: string;
   assignedUser: string;
-  
+
   // Dates
   requestDate: string;
   blockStartDate: string;
@@ -36,12 +36,12 @@ interface ProcessedAction {
   pendingEndDate: string;
   inProgressStartDate: string;
   completionDate: string;
-  
+
   // Cost and SLA
   actionCost: string;
   actionSLA: string;
   slaStatus: string;
-  
+
   // Dependencies
   associatedActionId: string;
   associatedActionName: string;
@@ -57,24 +57,24 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
 
   // Helper to calculate duration from PENDENTE to completion
   const calculateDuration = (order: ServiceOrder): number => {
-    if (!order.history || order.history.length === 0) return 0;
-    
-    const sortedHistory = [...order.history].sort((a, b) => 
+    if (!order.history || !Array.isArray(order.history) || order.history.length === 0) return 0;
+
+    const sortedHistory = [...order.history].sort((a, b) =>
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
-    
+
     const firstPending = sortedHistory.find(h => h.status === 'PENDENTE');
     if (!firstPending) return 0;
-    
+
     const start = new Date(firstPending.timestamp);
     const end = order.completedAt ? new Date(order.completedAt) : new Date();
-    
+
     return (end.getTime() - start.getTime()) / (1000 * 60); // minutes
   };
 
   // Helper to get status transition dates
   const getStatusDates = (order: ServiceOrder) => {
-    if (!order.history || order.history.length === 0) {
+    if (!order.history || !Array.isArray(order.history) || order.history.length === 0) {
       return {
         blockStart: '',
         blockEnd: '',
@@ -84,20 +84,20 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
       };
     }
 
-    const sortedHistory = [...order.history].sort((a, b) => 
+    const sortedHistory = [...order.history].sort((a, b) =>
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
     const blockStart = sortedHistory.find(h => h.status === 'BLOQUEADO');
-    const blockEnd = [...sortedHistory].reverse().find((h, i, arr) => 
+    const blockEnd = [...sortedHistory].reverse().find((h, i, arr) =>
       h.status === 'BLOQUEADO' && i > 0 && arr[i - 1].status !== 'BLOQUEADO'
     );
-    
+
     const pendingStart = sortedHistory.find(h => h.status === 'PENDENTE');
-    const pendingEnd = [...sortedHistory].reverse().find((h, i, arr) => 
+    const pendingEnd = [...sortedHistory].reverse().find((h, i, arr) =>
       h.status === 'PENDENTE' && i > 0 && arr[i - 1].status !== 'PENDENTE'
     );
-    
+
     const inProgressStart = sortedHistory.find(h => h.status === 'EM_ANDAMENTO');
 
     return {
@@ -125,15 +125,15 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
       const sector = bed ? sectors.find(s => s.id === bed.sectorId) : null;
       const requester = users.find(u => u.id === order.requestedById);
       const assigned = users.find(u => u.id === order.assignedToUserId);
-      
+
       const flowOrders = flowGroups[order.groupId] || [];
-      const flowStatus = flowOrders.every(o => o.status === 'CONCLUIDO') ? 'CONCLUIDO' : 
-                        flowOrders.some(o => o.status === 'EM_ANDAMENTO') ? 'EM_ANDAMENTO' : 'PENDENTE';
+      const flowStatus = flowOrders.every(o => o.status === 'CONCLUIDO') ? 'CONCLUIDO' :
+        flowOrders.some(o => o.status === 'EM_ANDAMENTO') ? 'EM_ANDAMENTO' : 'PENDENTE';
       const flowStart = flowOrders.reduce((min, o) => {
         const date = new Date(o.createdAt);
         return date < min ? date : min;
       }, new Date(flowOrders[0]?.createdAt || Date.now()));
-      const flowEnd = flowStatus === 'CONCLUIDO' ? 
+      const flowEnd = flowStatus === 'CONCLUIDO' ?
         flowOrders.reduce((max, o) => {
           if (!o.completedAt) return max;
           const date = new Date(o.completedAt);
@@ -142,7 +142,7 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
 
       const statusDates = getStatusDates(order);
       const duration = calculateDuration(order);
-      
+
       const subOrderConfig = service?.config?.subOrders?.[order.step];
       const step = subOrderConfig?.stepId ? steps.find(s => s.id === subOrderConfig.stepId) : null;
       const slaStatus = step?.slaMinutes && duration > step.slaMinutes && order.status !== 'BLOQUEADO' ? 'Fora do Prazo' : 'No Prazo';
@@ -158,7 +158,7 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
         flowStatus,
         flowRequestDate: flowStart.toISOString(),
         flowCompletionDate: flowStatus === 'CONCLUIDO' ? flowEnd.toISOString() : '',
-        
+
         actionId: order.id,
         actionName: order.subServiceName || `Ação ${order.step + 1}`,
         actionStatus: order.status,
@@ -166,7 +166,7 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
         bed: bed?.name || '',
         requesterUser: requester?.name || '',
         assignedUser: assigned?.name || '',
-        
+
         requestDate: order.createdAt,
         blockStartDate: statusDates.blockStart,
         blockEndDate: statusDates.blockEnd,
@@ -174,11 +174,11 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
         pendingEndDate: statusDates.pendingEnd,
         inProgressStartDate: statusDates.inProgressStart,
         completionDate: order.completedAt || '',
-        
+
         actionCost: step?.cost?.toString() || '0',
         actionSLA: step?.slaMinutes?.toString() || '',
         slaStatus,
-        
+
         associatedActionId: depOrder?.id || '',
         associatedActionName: depOrder?.subServiceName || '',
         associatedFlowName: depService?.name || '',
@@ -198,9 +198,9 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
       if (searchTerm) {
         const search = searchTerm.toLowerCase();
         return action.flowName.toLowerCase().includes(search) ||
-               action.actionName.toLowerCase().includes(search) ||
-               action.bed.toLowerCase().includes(search) ||
-               action.sector.toLowerCase().includes(search);
+          action.actionName.toLowerCase().includes(search) ||
+          action.bed.toLowerCase().includes(search) ||
+          action.sector.toLowerCase().includes(search);
       }
       return true;
     });
@@ -259,7 +259,7 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
     const url = URL.createObjectURL(blob);
     const now = new Date();
     const filename = `acoes_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}.csv`;
-    
+
     link.setAttribute('href', url);
     link.setAttribute('download', filename);
     link.style.visibility = 'hidden';
