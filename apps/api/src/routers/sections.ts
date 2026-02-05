@@ -7,6 +7,10 @@ export const sectionsRouter = router({
       sectorId: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
+      if (!ctx.user.companyId) {
+        throw new Error('Usuário não possui empresa associada');
+      }
+
       const where: any = {
         companyId: ctx.user.companyId,
       };
@@ -33,6 +37,10 @@ export const sectionsRouter = router({
       sectorId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.companyId) {
+        throw new Error('Usuário não possui empresa associada');
+      }
+
       return await ctx.prisma.section.create({
         data: {
           name: input.name,
@@ -52,6 +60,10 @@ export const sectionsRouter = router({
       sectorId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.companyId) {
+        throw new Error('Usuário não possui empresa associada');
+      }
+
       // Verificar se a seção pertence à empresa do usuário
       const section = await ctx.prisma.section.findFirst({
         where: {
@@ -86,6 +98,11 @@ export const sectionsRouter = router({
 
       if (bedsCount > 0) {
         throw new Error('Não é possível excluir seção com leitos associados');
+      }
+
+      // Verificar se o usuário tem uma empresa associada
+      if (!ctx.user.companyId) {
+        throw new Error('Usuário não possui empresa associada');
       }
 
       // Verificar se a seção pertence à empresa do usuário
