@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Bed, ServiceType, ActionStatus, User, ServiceOrder, ComplementItem, Step } from '@gestao-leitos/types';
 import { ClipboardCheck, ArrowRight, Layers, Package, Plus, Minus, DollarSign, AlertCircle, Eye, EyeOff, User as UserIcon } from 'lucide-react';
 import { trpc } from '../lib/trpc';
+import OrderConfirmationModal from './OrderConfirmationModal';
 
 interface ServiceRequestFormProps {
   beds: Bed[];
@@ -23,14 +24,27 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
   const [selectedBedId, setSelectedBedId] = useState('');
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [notes, setNotes] = useState('');
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
+  const [lastCreatedOrder, setLastCreatedOrder] = useState<any>(null);
 
   const createOrderMutation = trpc.orders.create.useMutation({
-    onSuccess: () => {
-      onSuccess();
-      // Reset form
+    onSuccess: (data) => {
+      // Armazenar dados da ordem criada
+      setLastCreatedOrder(data);
+      
+      // Exibir modal de confirmação
+      setShowConfirmationModal(true);
+      
+      // Limpar formulário
       setSelectedBedId('');
       setSelectedServiceId('');
       setNotes('');
+      setSelectedItemsPerStep({});
+      setDependencies({});
+      setShowDependency({});
+      
+      // Chamar callback de sucesso
+      onSuccess();
     },
     onError: (error) => {
       alert(`Erro ao criar solicitação: ${error.message}`);
@@ -263,7 +277,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
             <ClipboardCheck size={24} />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-slate-800">Nova Solicitação de Fluxo</h3>
+            <h3 className="text-xl font-bold text-slate-800">Nova Solicitação</h3>
             <p className="text-slate-500 text-sm">Escolha quais ações incluir e selecione 1 insumo por ação.</p>
           </div>
         </div>
@@ -274,14 +288,14 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
         <div className="lg:col-span-2 space-y-4 md:space-y-6">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Leito</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Origem da Solicitação</label>
             <select
               required
               value={selectedBedId}
               onChange={(e) => setSelectedBedId(e.target.value)}
               className="w-full p-4 bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 outline-none transition-shadow text-sm font-bold"
             >
-              <option value="">Escolha um leito disponível...</option>
+              <option value="">Escolha a origem da solicitação...</option>
               {availableBeds.map(bed => (
                 <option key={bed.id} value={bed.id}>
                   {bed.name} ({bed.status})
@@ -291,7 +305,7 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Serviço / Fluxo</label>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Serviço</label>
             <div className="grid grid-cols-1 gap-3">
               {services.map(service => (
                 <button
@@ -640,6 +654,14 @@ const ServiceRequestForm: React.FC<ServiceRequestFormProps> = ({
           </div>
         </div>
       </form>
+
+      {/* Modal de Confirmação */}
+      {showConfirmationModal && lastCreatedOrder && (
+        <OrderConfirmationModal
+          orderData={lastCreatedOrder}
+          onClose={() => setShowConfirmationModal(false)}
+        />
+      )}
     </div>
   );
 };

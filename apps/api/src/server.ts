@@ -5,23 +5,19 @@ import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import { TRPCError } from '@trpc/server';
 import { appRouter } from './routers';
 import { createContext } from './context';
+import { loggingMiddleware } from './middleware/logging';
+import { logger } from './utils/logger';
 import 'dotenv/config';
 
 const server = Fastify({
-  logger: {
-    level: process.env.LOG_LEVEL || 'info',
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname',
-      },
-    },
-  },
+  logger: false, // Disable Fastify's logger, use our custom logger
   maxParamLength: 5000,
 });
 
 async function main() {
+  // Logging middleware (must be first)
+  server.addHook('onRequest', loggingMiddleware);
+
   // Cookie parser (must be registered before routes)
   await server.register(fastifyCookie, {
     secret: process.env.COOKIE_SECRET || 'dev-cookie-secret-change-in-production',
@@ -44,7 +40,7 @@ async function main() {
       router: appRouter,
       createContext,
       onError({ path, error }: { path?: string; error: TRPCError }) {
-        server.log.error({ path, error }, 'tRPC Error');
+        logger.error({ path, error: error.message, code: error.code }, 'tRPC Error');
       },
     },
   });
@@ -61,18 +57,20 @@ async function main() {
 
   await server.listen({ port, host });
 
-  server.log.info(`🚀 Server running on http://localhost:${port}`);
-  server.log.info(`📡 tRPC endpoint: http://localhost:${port}/trpc`);
-  server.log.info(`❤️  Health check: http://localhost:${port}/health`);
+  logger.info(`🚀 Server running on http://localhost:${port}`);
+  logger.info(`📡 tRPC endpoint: http://localhost:${port}/trpc`);
+  logger.info(`❤️  Health check: http://localhost:${port}/health`);
 }
 
 main().catch((err) => {
-  server.log.error(err);
+  logger.error(err, 'Failed to start server');
   process.exit(1);
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
+  logger.info('Shutting down gracefully...');
   await server.close();
+  logger.info('Server closed');
   process.exit(0);
 });

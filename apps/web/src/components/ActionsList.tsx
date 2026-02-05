@@ -57,16 +57,18 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
 
   // Helper to calculate duration from PENDENTE to completion
   const calculateDuration = (order: ServiceOrder): number => {
-    if (!order.history || !Array.isArray(order.history) || order.history.length === 0) return 0;
+    // Backend retorna orderHistory, não history
+    const rawHistory = (order as any).orderHistory || order.history || [];
+    if (!Array.isArray(rawHistory) || rawHistory.length === 0) return 0;
 
-    const sortedHistory = [...order.history].sort((a, b) =>
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    const sortedHistory = [...rawHistory].sort((a, b) =>
+      new Date(a.timestamp || a.createdAt).getTime() - new Date(b.timestamp || b.createdAt).getTime()
     );
 
     const firstPending = sortedHistory.find(h => h.status === 'PENDENTE');
     if (!firstPending) return 0;
 
-    const start = new Date(firstPending.timestamp);
+    const start = new Date(firstPending.timestamp || firstPending.createdAt);
     const end = order.completedAt ? new Date(order.completedAt) : new Date();
 
     return (end.getTime() - start.getTime()) / (1000 * 60); // minutes
@@ -74,7 +76,9 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
 
   // Helper to get status transition dates
   const getStatusDates = (order: ServiceOrder) => {
-    if (!order.history || !Array.isArray(order.history) || order.history.length === 0) {
+    // Backend retorna orderHistory, não history
+    const rawHistory = (order as any).orderHistory || order.history || [];
+    if (!Array.isArray(rawHistory) || rawHistory.length === 0) {
       return {
         blockStart: '',
         blockEnd: '',
@@ -84,28 +88,35 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
       };
     }
 
-    const sortedHistory = [...order.history].sort((a, b) =>
-      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    const sortedHistory = [...rawHistory].sort((a, b) =>
+      new Date(a.timestamp || a.createdAt).getTime() - new Date(b.timestamp || b.createdAt).getTime()
     );
 
+    // Encontrar primeira ocorrência de cada status
     const blockStart = sortedHistory.find(h => h.status === 'BLOQUEADO');
-    const blockEnd = [...sortedHistory].reverse().find((h, i, arr) =>
-      h.status === 'BLOQUEADO' && i > 0 && arr[i - 1].status !== 'BLOQUEADO'
+    
+    // Encontrar última ocorrência de BLOQUEADO (quando saiu do bloqueio)
+    const blockEndIndex = sortedHistory.findIndex((h, i, arr) => 
+      h.status === 'BLOQUEADO' && i < arr.length - 1 && arr[i + 1].status !== 'BLOQUEADO'
     );
+    const blockEnd = blockEndIndex >= 0 ? sortedHistory[blockEndIndex + 1] : null;
 
     const pendingStart = sortedHistory.find(h => h.status === 'PENDENTE');
-    const pendingEnd = [...sortedHistory].reverse().find((h, i, arr) =>
-      h.status === 'PENDENTE' && i > 0 && arr[i - 1].status !== 'PENDENTE'
+    
+    // Encontrar quando saiu de PENDENTE
+    const pendingEndIndex = sortedHistory.findIndex((h, i, arr) => 
+      h.status === 'PENDENTE' && i < arr.length - 1 && arr[i + 1].status !== 'PENDENTE'
     );
+    const pendingEnd = pendingEndIndex >= 0 ? sortedHistory[pendingEndIndex + 1] : null;
 
     const inProgressStart = sortedHistory.find(h => h.status === 'EM_ANDAMENTO');
 
     return {
-      blockStart: blockStart?.timestamp || '',
-      blockEnd: blockEnd?.timestamp || '',
-      pendingStart: pendingStart?.timestamp || '',
-      pendingEnd: pendingEnd?.timestamp || '',
-      inProgressStart: inProgressStart?.timestamp || '',
+      blockStart: blockStart ? (blockStart.timestamp || blockStart.createdAt) : '',
+      blockEnd: blockEnd ? (blockEnd.timestamp || blockEnd.createdAt) : '',
+      pendingStart: pendingStart ? (pendingStart.timestamp || pendingStart.createdAt) : '',
+      pendingEnd: pendingEnd ? (pendingEnd.timestamp || pendingEnd.createdAt) : '',
+      inProgressStart: inProgressStart ? (inProgressStart.timestamp || inProgressStart.createdAt) : '',
     };
   };
 
@@ -152,6 +163,11 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
       const depOrder = depOrderId ? orders.find(o => o.id === depOrderId) : null;
       const depService = depOrder ? services.find(s => s.id === depOrder.serviceTypeId) : null;
 
+      // Calcular custo total dos itens da ordem
+      const totalCost = (order.items || []).reduce((sum, item) => 
+        sum + (item.unitCost * item.quantity), 0
+      );
+
       actions.push({
         flowId: order.groupId,
         flowName: service?.name || '',
@@ -175,7 +191,7 @@ const ActionsList: React.FC<ActionsListProps> = ({ orders, services, beds, secto
         inProgressStartDate: statusDates.inProgressStart,
         completionDate: order.completedAt || '',
 
-        actionCost: step?.cost?.toString() || '0',
+        actionCost: totalCost.toFixed(2),
         actionSLA: step?.slaMinutes?.toString() || '',
         slaStatus,
 

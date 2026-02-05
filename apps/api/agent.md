@@ -13,10 +13,17 @@
 ### Domínios
 - **Auth**: Login, logout, me (obter usuário atual) ✅
 - **Leitos**: CRUD de leitos, atualização de status ✅
-- **Orders**: Ordens de serviço, workflow, ações ✅
+- **Orders**: Ordens de serviço, workflow, dependências/bloqueios ✅
 - **Services**: Tipos de serviço (Higienização, Manutenção, etc.) ✅
 - **Users**: Gerenciamento de usuários, hash de senha ✅
 - **Teams**: Gerenciamento de equipes ✅
+- **Companies**: Gerenciamento de empresas ✅
+- **Units**: Gerenciamento de unidades ✅
+- **Sectors**: Gerenciamento de setores ✅
+- **Sections**: Gerenciamento de seções (subdivisões de setores) ✅
+- **Steps**: Gerenciamento de etapas de serviço ✅
+- **Config**: Configurações do sistema ✅
+- **ComplementItems**: Itens complementares ✅
 - **Reports**: Relatórios e dashboards (futuro)
 
 ---
@@ -30,23 +37,25 @@ apps/api/
 │   │   ├── index.ts       # App router (combina todos)
 │   │   ├── auth.ts        # Autenticação ✅
 │   │   ├── leitos.ts      # Leitos ✅
-│   │   ├── orders.ts      # Ordens de serviço ✅
+│   │   ├── orders.ts      # Ordens de serviço + dependências ✅
 │   │   ├── services.ts    # Tipos de serviço ✅
 │   │   ├── users.ts       # Usuários ✅
-│   │   └── teams.ts       # Equipes ✅
-│   │
-│   ├── procedures/        # Business logic (opcional)
-│   │   └── leitos/
-│   │       ├── list.ts
-│   │       └── updateStatus.ts
+│   │   ├── teams.ts       # Equipes ✅
+│   │   ├── companies.ts   # Empresas ✅
+│   │   ├── units.ts       # Unidades ✅
+│   │   ├── sectors.ts     # Setores ✅
+│   │   ├── sections.ts    # Seções ✅
+│   │   ├── steps.ts       # Etapas de serviço ✅
+│   │   ├── config.ts      # Configurações ✅
+│   │   └── complementItems.ts # Itens complementares ✅
 │   │
 │   ├── middleware/        # Middlewares
-│   │   ├── auth.ts        # Autenticação
-│   │   └── logging.ts     # Logging
+│   │   └── logging.ts     # Request logging ✅
 │   │
 │   ├── utils/             # Utilitários
-│   │   ├── logger.ts      # Logger configurado
-│   │   └── errors.ts      # Error classes
+│   │   ├── jwt.ts         # JWT utilities ✅
+│   │   ├── logger.ts      # Logger centralizado ✅
+│   │   └── errors.ts      # Error classes ✅
 │   │
 │   ├── context.ts         # tRPC context
 │   ├── trpc.ts            # tRPC setup
@@ -167,10 +176,10 @@ list: protectedProcedure
 
 ### 5. Logging
 
-**Usar logger estruturado**
+**Usar logger centralizado**
 
 ```typescript
-import { logger } from '../utils/logger';
+import { logger, createLogger } from '../utils/logger';
 
 // Info
 logger.info({ userId: ctx.user.id }, 'User logged in');
@@ -180,6 +189,36 @@ logger.error({ error, bedId: input.id }, 'Failed to update bed status');
 
 // Debug
 logger.debug({ input }, 'Processing request');
+
+// Child logger com contexto
+const orderLogger = createLogger({ module: 'orders' });
+orderLogger.info({ orderId: '123' }, 'Order created');
+```
+
+### 6. Error Handling com Classes Customizadas
+
+**Usar error classes específicas do domínio**
+
+```typescript
+import { BedNotFoundError, OrderBlockedError, handlePrismaError } from '../utils/errors';
+
+// Throw specific errors
+const bed = await ctx.prisma.bed.findUnique({ where: { id } });
+if (!bed) {
+  throw new BedNotFoundError(id);
+}
+
+// Handle Prisma errors
+try {
+  await ctx.prisma.user.create({ data: { cpf: '123' } });
+} catch (error) {
+  throw handlePrismaError(error);
+}
+
+// Business logic errors
+if (order.status === 'BLOQUEADO') {
+  throw new OrderBlockedError(order.id, order.dependsOnOrderIds);
+}
 ```
 
 ---
@@ -240,15 +279,29 @@ import { validateCPF } from '@gestao-leitos/utils';
 
 ### Dependência de Ordens (Bloqueios)
 
-O sistema suporta dependências entre ordens de serviço para encadear fluxos de trabalho complexos.
+O sistema suporta dependências entre ordens de serviço para encadear fluxos de trabalho complexos. **Implementado em 2026-01-30** ✅
 
 1.  **Tipos de Dependência**:
     *   **BLOQUEADA**: A nova ordem nasce com status `BLOQUEADO` e aguarda a conclusão da ordem alvo.
     *   **BLOQUEADOR**: A nova ordem bloqueia uma ordem existente (que muda para `BLOQUEADO`) e deve ser concluída antes dela.
+    *   **SEQUENCIAL**: Dependência automática entre etapas do mesmo fluxo (step N depende de step N-1).
 
-2.  **Liberação Automática**:
-    *   Quando uma ordem é concluída (`updateStatus` -> `CONCLUIDO`), o sistema verifica se existem outras ordens que dependem dela (`dependsOnOrderIds`).
-    *   Se TODAS as dependências de uma ordem bloqueada estiverem concluídas, ela é liberada automaticamente para `PENDENTE`.
+2.  **Modelo de Dados**:
+    *   Tabela `OrderDependency` relaciona ordens bloqueadas com ordens bloqueadoras.
+    *   Campo `dependsOnOrderIds` no `ServiceOrder` (array de IDs).
+    *   Campo `type` na dependência: `BLOQUEIO`, `SEQUENCIAL`.
+
+3.  **Liberação Automática**:
+    *   Quando uma ordem é concluída (`updateStatus` -> `CONCLUIDO`), o sistema:
+        - Verifica ordens que dependem dela via `OrderDependency`.
+        - Valida se TODAS as dependências estão concluídas usando `checkDependencies()`.
+        - Libera automaticamente ordens bloqueadas para `PENDENTE`.
+        - Cria histórico de liberação automática.
+
+4.  **Implementação**:
+    *   `orders.create`: Processa campo `dependency` em cada step.
+    *   `orders.updateStatus`: Libera dependentes ao concluir.
+    *   Helper `checkDependencies()`: Valida se todas as dependências estão concluídas.
 
 ### Auditoria
 
@@ -382,10 +435,141 @@ Antes de fazer PR, verificar:
 
 ---
 
+## 📊 Status Atual (Atualizado em 2026-02-04)
+
+### ✅ Implementado
+- 13 routers tRPC completos (auth, leitos, orders, services, users, teams, companies, units, sectors, steps, config, complementItems)
+- Sistema completo de dependências/bloqueios entre ordens
+- Liberação automática de ordens bloqueadas
+- Auditoria completa de todas as mutations
+- Validação com Zod em todos os inputs
+- Autenticação e autorização
+- Histórico de ordens e leitos
+- Integração completa com PostgreSQL via Prisma
+- **Logger centralizado** (Pino) ✅ NOVO
+- **Error classes customizadas** com mensagens em português ✅ NOVO
+- **Logging middleware** com request-id e métricas ✅ NOVO
+
+### 🔄 Em Progresso
+- Testes de integração do fluxo de dependências
+- Documentação de APIs
+
+### 📋 Pendente
+- WebSockets para real-time updates
+- Rate limiting
+- Caching com Redis
+- Métricas e observabilidade
+- OpenTelemetry tracing
+
+---
+
+## 📦 Seções (Sections)
+
+### Visão Geral
+**Data de Implementação**: 2026-02-05
+
+Seções são subdivisões opcionais de Setores, permitindo melhor organização hierárquica:
+- **Hierarquia**: Empresa > Unidade > Setor > **Seção** > Leito
+- **Opcional**: Leitos podem ou não ter seção associada
+- **Obrigatório**: Leitos sempre devem ter setor
+
+### Casos de Uso
+1. **Setor com Seções**: UTI pode ter "UTI Adulto", "UTI Pediátrica"
+2. **Setor sem Seções**: Pronto Socorro não precisa de subdivisões
+3. **Leito com Seção**: Leito 101 → Seção "UTI Adulto" → Setor "UTI"
+4. **Leito sem Seção**: Leito PS01 → Setor "Pronto Socorro"
+
+### Schema Prisma
+```prisma
+model Section {
+  id        String   @id @default(cuid())
+  name      String
+  sectorId  String
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sector Sector @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+  beds   Bed[]
+
+  @@index([sectorId])
+  @@index([companyId])
+  @@map("sections")
+}
+
+model Bed {
+  // ... campos existentes
+  sectionId String?
+  section   Section? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  
+  @@index([sectionId])
+}
+```
+
+### API Router
+```typescript
+// routers/sections.ts
+export const sectionsRouter = router({
+  list: protectedProcedure
+    .input(z.object({ sectorId: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      return await prisma.section.findMany({
+        where: {
+          companyId: ctx.user.companyId,
+          ...(input?.sectorId && { sectorId: input.sectorId }),
+        },
+        include: {
+          sector: true,
+          _count: { select: { beds: true } },
+        },
+      });
+    }),
+
+  create: protectedProcedure
+    .input(z.object({
+      name: z.string().min(2),
+      sectorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => { /* ... */ }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      name: z.string().min(2),
+      sectorId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => { /* ... */ }),
+
+  delete: adminProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // Verifica se há leitos associados antes de excluir
+      const bedsCount = await prisma.bed.count({
+        where: { sectionId: input.id },
+      });
+      if (bedsCount > 0) {
+        throw new Error('Não é possível excluir seção com leitos associados');
+      }
+      // ...
+    }),
+});
+```
+
+### Regras de Negócio
+1. **Criação**: Seção deve estar associada a um setor válido
+2. **Exclusão**: Não pode excluir seção com leitos associados
+3. **Leitos**: Podem ter `sectionId` null (sem seção)
+4. **Cascade**: Excluir setor exclui suas seções
+5. **SetNull**: Excluir seção define `sectionId` dos leitos como null
+
+---
+
 ## 🎯 Próximos Passos
 
-1. Implementar WebSockets para real-time
-2. Adicionar rate limiting
-3. Implementar caching com Redis
-4. Adicionar métricas
-5. Implementar tracing
+1. Executar migration do banco de dados para adicionar tabela `sections`
+2. Testar fluxo completo de dependências (OS A bloqueia OS B → Concluir OS A → OS B liberada)
+3. Implementar WebSockets para real-time
+3. Adicionar rate limiting
+4. Implementar caching com Redis
+5. Adicionar métricas e dashboards
+6. Implementar tracing com OpenTelemetry

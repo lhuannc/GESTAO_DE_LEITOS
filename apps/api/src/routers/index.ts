@@ -8,6 +8,7 @@ import { teamsRouter } from './teams';
 import { companiesRouter } from './companies';
 import { unitsRouter } from './units';
 import { sectorsRouter } from './sectors';
+import { sectionsRouter } from './sections';
 import { stepsRouter } from './steps';
 import { configRouter } from './config';
 import { complementItemsRouter } from './complementItems';
@@ -26,6 +27,7 @@ export const appRouter = router({
   companies: companiesRouter,
   units: unitsRouter,
   sectors: sectorsRouter,
+  sections: sectionsRouter,
   steps: stepsRouter,
   config: configRouter,
   complementItems: complementItemsRouter,

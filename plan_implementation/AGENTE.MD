@@ -1,4 +1,4 @@
-# Diretrizes da Pasta DAILY_DEV
+# Diretrizes da Pasta plan_implementation
 
 Esta pasta serve como o diário de engenharia e registro de decisões técnicas do projeto. Aqui são armazenados todos os planos de implementação e checklists de execução.
 

@@ -21,10 +21,23 @@ export interface Sector {
   unitId: string;
 }
 
+export interface Section {
+  id: string;
+  name: string;
+  sectorId: string;
+  sector?: Sector;
+  companyId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Bed {
   id: string;
   name: string;
   sectorId: string;
+  sector?: Sector;
+  sectionId?: string;
+  section?: Section;
   status: BedStatus;
 }
 

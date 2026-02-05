@@ -276,16 +276,35 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
 
   const getDurations = (order: ServiceOrder) => {
     const statusTimes: Record<string, number> = { BLOQUEADO: 0, PENDENTE: 0, EM_ANDAMENTO: 0, CONCLUIDO: 0 };
-    if (!order.history || !Array.isArray(order.history)) return { statusTimes, totalTime: 0, history: [] };
-    const history = [...order.history].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    
+    // Backend retorna orderHistory, não history
+    const rawHistory = (order as any).orderHistory || order.history || [];
+    if (!Array.isArray(rawHistory) || rawHistory.length === 0) {
+      // Se não houver histórico, calcular tempo total desde criação
+      const startTime = new Date(order.createdAt || order.requestedAt || Date.now()).getTime();
+      const endTime = order.status === 'CONCLUIDO' 
+        ? new Date(order.completedAt || order.finishedAt || Date.now()).getTime()
+        : now;
+      const totalTime = endTime - startTime;
+      return { statusTimes, totalTime, history: [] };
+    }
+    
+    const history = [...rawHistory].sort((a, b) => new Date(a.timestamp || a.createdAt).getTime() - new Date(b.timestamp || b.createdAt).getTime());
+    
     for (let i = 0; i < history.length; i++) {
-      const start = new Date(history[i].timestamp).getTime();
+      const start = new Date(history[i].timestamp || history[i].createdAt).getTime();
       const end = i < history.length - 1
-        ? new Date(history[i + 1].timestamp).getTime()
-        : (order.status === 'CONCLUIDO' ? new Date(order.finishedAt!).getTime() : now);
+        ? new Date(history[i + 1].timestamp || history[i + 1].createdAt).getTime()
+        : (order.status === 'CONCLUIDO' ? new Date(order.completedAt || order.finishedAt || Date.now()).getTime() : now);
       statusTimes[history[i].status] += (end - start);
     }
-    const totalTime = (order.status === 'CONCLUIDO' ? new Date(order.finishedAt!).getTime() : now) - new Date(order.requestedAt).getTime();
+    
+    const startTime = new Date(order.createdAt || order.requestedAt || Date.now()).getTime();
+    const endTime = order.status === 'CONCLUIDO'
+      ? new Date(order.completedAt || order.finishedAt || Date.now()).getTime()
+      : now;
+    const totalTime = endTime - startTime;
+    
     return { statusTimes, totalTime, history };
   };
 
@@ -510,34 +529,43 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                         <History size={16} className="text-sky-500" /> <span>Rastreabilidade de Execução</span>
                       </h5>
                       <div className="space-y-6">
-                        {getDurations(editingOrder).history.map((h, i, arr) => {
-                          const prevTime = i === 0 ? new Date(editingOrder.requestedAt).getTime() : new Date(arr[i - 1].timestamp).getTime();
-                          const diff = new Date(h.timestamp).getTime() - prevTime;
-                          const isTooFast = diff < 60000 && diff > 0 && h.status === 'CONCLUIDO';
+                        {getDurations(editingOrder).history.length > 0 ? (
+                          getDurations(editingOrder).history.map((h, i, arr) => {
+                            const timestamp = h.timestamp || h.createdAt || new Date().toISOString();
+                            const prevTime = i === 0 
+                              ? new Date(editingOrder.createdAt || editingOrder.requestedAt || Date.now()).getTime() 
+                              : new Date(arr[i - 1].timestamp || arr[i - 1].createdAt || Date.now()).getTime();
+                            const diff = new Date(timestamp).getTime() - prevTime;
+                            const isTooFast = diff < 60000 && diff > 0 && h.status === 'CONCLUIDO';
 
-                          return (
-                            <div key={i} className="relative pl-8 pb-4 border-l-2 border-slate-100 ml-2">
-                              <div className={`absolute left-[-9px] top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 ${h.status === 'CONCLUIDO' ? 'bg-emerald-500' :
-                                  h.status === 'EM_ANDAMENTO' ? 'bg-sky-500' : 'bg-amber-500'
-                                }`} />
-                              <div className="flex flex-col">
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider">{h.status.replace('_', ' ')}</span>
-                                  <div className="flex items-center gap-2">
-                                    {i > 0 && (
-                                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm ${isTooFast ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>
-                                        {isTooFast && <Timer size={10} className="animate-pulse" />}
-                                        +{formatDuration(diff)}
-                                      </span>
-                                    )}
-                                    <span className="text-[10px] font-bold text-slate-400">{new Date(h.timestamp).toLocaleTimeString()}</span>
+                            return (
+                              <div key={i} className="relative pl-8 pb-4 border-l-2 border-slate-100 ml-2">
+                                <div className={`absolute left-[-9px] top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm z-10 ${h.status === 'CONCLUIDO' ? 'bg-emerald-500' :
+                                    h.status === 'EM_ANDAMENTO' ? 'bg-sky-500' : 'bg-amber-500'
+                                  }`} />
+                                <div className="flex flex-col">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] font-black uppercase text-slate-800 tracking-wider">{h.status.replace('_', ' ')}</span>
+                                    <div className="flex items-center gap-2">
+                                      {i > 0 && (
+                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm ${isTooFast ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-500'}`}>
+                                          {isTooFast && <Timer size={10} className="animate-pulse" />}
+                                          +{formatDuration(diff)}
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] font-bold text-slate-400">{new Date(timestamp).toLocaleTimeString()}</span>
+                                    </div>
                                   </div>
+                                  <p className="text-xs text-slate-500 font-medium">{h.note || (h as any).notes || 'Fluxo iniciado.'}</p>
                                 </div>
-                                <p className="text-xs text-slate-500 font-medium">{h.note || 'Evento de sistema'}</p>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })
+                        ) : (
+                          <div className="text-center py-8">
+                            <p className="text-xs text-slate-400 font-medium">Nenhum histórico de execução disponível</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </>

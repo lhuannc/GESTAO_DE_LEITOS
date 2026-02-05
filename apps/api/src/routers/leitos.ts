@@ -33,6 +33,7 @@ export const leitosRouter = router({
               },
             },
           },
+          section: true,
         },
         orderBy: {
           name: 'asc',
@@ -158,6 +159,7 @@ export const leitosRouter = router({
       z.object({
         name: z.string().min(1),
         sectorId: z.string(),
+        sectionId: z.string().optional(),
         status: z.enum(['DISPONIVEL', 'OCUPADO', 'HIGIENIZACAO', 'MANUTENCAO', 'BLOQUEADO']).default('DISPONIVEL'),
       })
     )
@@ -182,6 +184,7 @@ export const leitosRouter = router({
         id: z.string(),
         name: z.string().min(1).optional(),
         sectorId: z.string().optional(),
+        sectionId: z.string().optional().nullable(),
         status: z.enum(['DISPONIVEL', 'OCUPADO', 'HIGIENIZACAO', 'MANUTENCAO', 'BLOQUEADO']).optional(),
       })
     )

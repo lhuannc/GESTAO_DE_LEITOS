@@ -70,10 +70,27 @@ model Sector {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  unit Unit  @relation(fields: [unitId], references: [id], onDelete: Cascade)
-  beds Bed[]
+  unit     Unit      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  beds     Bed[]
+  sections Section[]
 
   @@map("sectors")
+}
+
+model Section {
+  id        String   @id @default(cuid())
+  name      String
+  sectorId  String
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sector Sector @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+  beds   Bed[]
+
+  @@index([sectorId])
+  @@index([companyId])
+  @@map("sections")
 }
 
 model Bed {
@@ -81,14 +98,17 @@ model Bed {
   name      String
   status    BedStatus @default(DISPONIVEL)
   sectorId  String
+  sectionId String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
   sector        Sector         @relation(fields: [sectorId], references: [id], onDelete: Cascade)
+  section       Section?       @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   serviceOrders ServiceOrder[]
   bedHistory    BedHistory[]
 
   @@index([sectorId])
+  @@index([sectionId])
   @@index([status])
   @@map("beds")
 }
@@ -147,30 +167,30 @@ model ServiceType {
 }
 
 model ServiceOrder {
-  id               String      @id @default(cuid())
-  groupId          String
-  bedId            String
-  serviceTypeId    String
-  subServiceName   String?
-  step             Int         @default(0)
-  status           OrderStatus @default(PENDENTE)
-  priority         Int         @default(0)
-  notes            String?
-  requestedById    String
-  assignedToTeamId String?
-  assignedToUserId String?
-  items            Json?       @default("[]")
-  history          Json?       @default("[]")
-  dependsOnOrderIds String[]   @default([])
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  completedAt      DateTime?
+  id                String      @id @default(cuid())
+  groupId           String
+  bedId             String
+  serviceTypeId     String
+  subServiceName    String?
+  step              Int         @default(0)
+  status            OrderStatus @default(PENDENTE)
+  priority          Int         @default(0)
+  notes             String?
+  requestedById     String
+  assignedToTeamId  String?
+  assignedToUserId  String?
+  items             Json?       @default("[]")
+  history           Json?       @default("[]")
+  dependsOnOrderIds String[]    @default([])
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  completedAt       DateTime?
 
-  bed            Bed         @relation(fields: [bedId], references: [id])
-  serviceType    ServiceType @relation(fields: [serviceTypeId], references: [id])
-  requestedBy    User        @relation("requestedBy", fields: [requestedById], references: [id])
-  assignedToTeam Team?       @relation("assignedToTeam", fields: [assignedToTeamId], references: [id])
-  assignedToUser User?       @relation("assignedToUser", fields: [assignedToUserId], references: [id])
+  bed            Bed               @relation(fields: [bedId], references: [id])
+  serviceType    ServiceType       @relation(fields: [serviceTypeId], references: [id])
+  requestedBy    User              @relation("requestedBy", fields: [requestedById], references: [id])
+  assignedToTeam Team?             @relation("assignedToTeam", fields: [assignedToTeamId], references: [id])
+  assignedToUser User?             @relation("assignedToUser", fields: [assignedToUserId], references: [id])
   actions        Action[]
   orderHistory   OrderHistory[]
   dependencies   OrderDependency[] @relation("BlockedOrder")
@@ -250,6 +270,7 @@ model OrderDependency {
   @@index([dependsOnId])
   @@map("order_dependencies")
 }
+
 model BedHistory {
   id        String    @id @default(cuid())
   bedId     String
@@ -283,12 +304,12 @@ model AuditLog {
 
 // CONFIGURATION
 model BedStatusConfig {
-  id          String   @id @default(cuid())
-  name        String
-  color       String
-  companyId   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  color     String
+  companyId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("bed_status_configs")
 }
