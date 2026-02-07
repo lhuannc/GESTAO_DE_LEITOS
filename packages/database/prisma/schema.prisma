@@ -37,6 +37,11 @@ enum UserRole {
   VISUALIZADOR
 }
 
+enum ReasonRule {
+  CANCELAMENTO
+  FORA_DO_PRAZO
+}
+
 // CORE ENTITIES
 model Company {
   id        String   @id @default(cuid())
@@ -127,10 +132,13 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  team            Team?          @relation(fields: [teamId], references: [id])
-  requestedOrders ServiceOrder[] @relation("requestedBy")
-  assignedOrders  ServiceOrder[] @relation("assignedToUser")
-  auditLogs       AuditLog[]
+  team                Team?                @relation(fields: [teamId], references: [id])
+  requestedOrders     ServiceOrder[]       @relation("requestedBy")
+  assignedOrders      ServiceOrder[]       @relation("assignedToUser")
+  cancelledOrders     ServiceOrder[]       @relation("cancelledBy")
+  auditLogs           AuditLog[]
+  cancellationRecords CancellationRecord[]
+  slaOverdueRecords   SLAOverdueRecord[]
 
   @@index([cpf])
   @@map("users")
@@ -185,16 +193,21 @@ model ServiceOrder {
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   completedAt       DateTime?
+  cancelledAt       DateTime?
+  cancelledByUserId String?
 
-  bed            Bed               @relation(fields: [bedId], references: [id])
-  serviceType    ServiceType       @relation(fields: [serviceTypeId], references: [id])
-  requestedBy    User              @relation("requestedBy", fields: [requestedById], references: [id])
-  assignedToTeam Team?             @relation("assignedToTeam", fields: [assignedToTeamId], references: [id])
-  assignedToUser User?             @relation("assignedToUser", fields: [assignedToUserId], references: [id])
-  actions        Action[]
-  orderHistory   OrderHistory[]
-  dependencies   OrderDependency[] @relation("BlockedOrder")
-  blocking       OrderDependency[] @relation("BlockingOrder")
+  bed                 Bed                  @relation(fields: [bedId], references: [id])
+  serviceType         ServiceType          @relation(fields: [serviceTypeId], references: [id])
+  requestedBy         User                 @relation("requestedBy", fields: [requestedById], references: [id])
+  assignedToTeam      Team?                @relation("assignedToTeam", fields: [assignedToTeamId], references: [id])
+  assignedToUser      User?                @relation("assignedToUser", fields: [assignedToUserId], references: [id])
+  cancelledBy         User?                @relation("cancelledBy", fields: [cancelledByUserId], references: [id])
+  actions             Action[]
+  orderHistory        OrderHistory[]
+  dependencies        OrderDependency[]    @relation("BlockedOrder")
+  blocking            OrderDependency[]    @relation("BlockingOrder")
+  cancellationRecords CancellationRecord[]
+  slaOverdueRecords   SLAOverdueRecord[]
 
   @@index([groupId])
   @@index([bedId])
@@ -300,6 +313,57 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// REASONS & CANCELLATION
+model Reason {
+  id        String     @id @default(cuid())
+  name      String
+  rule      ReasonRule
+  companyId String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  cancellationRecords CancellationRecord[]
+  slaOverdueRecords   SLAOverdueRecord[]
+
+  @@index([companyId])
+  @@index([rule])
+  @@map("reasons")
+}
+
+model CancellationRecord {
+  id       String   @id @default(cuid())
+  orderId  String
+  userId   String
+  reasonId String
+  notes    String?
+  createdAt DateTime @default(now())
+
+  order  ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id])
+  reason Reason       @relation(fields: [reasonId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@map("cancellation_records")
+}
+
+model SLAOverdueRecord {
+  id       String   @id @default(cuid())
+  orderId  String
+  userId   String
+  reasonId String
+  notes    String?
+  createdAt DateTime @default(now())
+
+  order  ServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id])
+  reason Reason       @relation(fields: [reasonId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@map("sla_overdue_records")
 }
 
 // CONFIGURATION

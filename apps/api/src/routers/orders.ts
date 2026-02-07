@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { router, protectedProcedure } from '../trpc';
 import { TRPCError } from '@trpc/server';
+import { compare } from 'bcrypt';
 
 // Helper to check if all dependencies are met
 // Helper to check if all dependencies are met
@@ -19,8 +20,69 @@ const checkDependencies = async (ctx: any, orderId: string, ignoreOrderIds: stri
   // Check if ALL dependencies are CONCLUIDO (ignoring specific IDs that are currently being completed)
   return dependencies.every((d: any) => {
     if (ignoreOrderIds.includes(d.dependsOn.id)) return true; // Treat ignored ones as effectively "done" for this check
-    return d.dependsOn.status === 'CONCLUIDO';
+    return d.dependsOn.status === 'CONCLUIDO' || d.dependsOn.status === 'CANCELADO';
   });
+};
+
+// Helper to release dependent orders when an order is completed or cancelled
+const releaseDependencies = async (ctx: any, completedOrderId: string) => {
+  // Find all orders that depend on this one
+  const dependentRelations = await ctx.prisma.orderDependency.findMany({
+    where: {
+      dependsOnId: completedOrderId
+    },
+    include: { order: true }
+  });
+
+  for (const rel of dependentRelations) {
+    if (rel.order.status === 'BLOQUEADO') {
+      // Check if all other dependencies are met
+      const canRelease = await checkDependencies(ctx, rel.order.id, [completedOrderId]);
+      
+      if (canRelease) {
+        await ctx.prisma.serviceOrder.update({
+          where: { id: rel.order.id },
+          data: {
+            status: 'PENDENTE',
+            orderHistory: {
+              create: {
+                status: 'PENDENTE',
+                note: `Liberado automaticamente: Dependência concluída/cancelada`
+              }
+            }
+          },
+        });
+      }
+    }
+  }
+};
+
+// Helper to check if SLA is violated
+const checkSLAViolation = async (ctx: any, order: any): Promise<boolean> => {
+  if (!order.serviceType?.steps || order.step === undefined) {
+    return false;
+  }
+
+  const serviceType = await ctx.prisma.serviceType.findUnique({
+    where: { id: order.serviceTypeId },
+    include: { steps: { orderBy: { order: 'asc' } } }
+  });
+
+  if (!serviceType?.steps || !serviceType.steps[order.step]) {
+    return false;
+  }
+
+  const step = serviceType.steps[order.step];
+  
+  if (!step.slaMinutes) {
+    return false;
+  }
+
+  const createdAt = new Date(order.createdAt);
+  const now = new Date();
+  const elapsedMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+
+  return elapsedMinutes > step.slaMinutes;
 };
 
 /**
@@ -275,6 +337,8 @@ export const ordersRouter = router({
       z.object({
         id: z.string(),
         status: z.enum(['PENDENTE', 'EM_ANDAMENTO', 'CONCLUIDO', 'CANCELADO', 'BLOQUEADO']),
+        slaOverdueReasonId: z.string().optional(),
+        slaOverdueNotes: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -285,6 +349,46 @@ export const ordersRouter = router({
 
       if (!order) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Ordem não encontrada' });
+      }
+
+      // Check SLA if completing the order
+      if (input.status === 'CONCLUIDO') {
+        const slaViolated = await checkSLAViolation(ctx, order);
+        
+        if (slaViolated && !input.slaOverdueReasonId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'SLA vencido - motivo obrigatório',
+          });
+        }
+
+        // If SLA overdue reason provided, create record
+        if (input.slaOverdueReasonId) {
+          // Verify reason exists and is valid
+          const reason = await ctx.prisma.reason.findFirst({
+            where: {
+              id: input.slaOverdueReasonId,
+              companyId: ctx.user.companyId,
+              rule: 'FORA_DO_PRAZO',
+            },
+          });
+
+          if (!reason) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Motivo de atraso inválido',
+            });
+          }
+
+          await ctx.prisma.sLAOverdueRecord.create({
+            data: {
+              orderId: input.id,
+              userId: ctx.userId!,
+              reasonId: input.slaOverdueReasonId,
+              notes: input.slaOverdueNotes,
+            },
+          });
+        }
       }
 
       // Update the order status
@@ -467,5 +571,132 @@ export const ordersRouter = router({
       });
 
       return order;
+    }),
+
+  /**
+   * Cancel an order with authentication and reason
+   */
+  cancel: protectedProcedure
+    .input(z.object({
+      id: z.string(),
+      reasonId: z.string(),
+      notes: z.string().optional(),
+      userLogin: z.string(),
+      userPassword: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // 1. Validate user credentials
+      const user = await ctx.prisma.user.findFirst({
+        where: {
+          login: input.userLogin,
+          companyId: ctx.user.companyId,
+        },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Credenciais inválidas',
+        });
+      }
+
+      // Verify password
+      const isValidPassword = await compare(input.userPassword, user.passwordHash);
+      
+      if (!isValidPassword) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Credenciais inválidas',
+        });
+      }
+
+      // 2. Fetch the order
+      const order = await ctx.prisma.serviceOrder.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!order) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Ordem não encontrada',
+        });
+      }
+
+      // 3. Validate order can be cancelled
+      if (order.status === 'CANCELADO') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Ação já está cancelada',
+        });
+      }
+
+      if (order.status === 'CONCLUIDO') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Não é possível cancelar ação concluída',
+        });
+      }
+
+      // 4. Verify reason exists and belongs to company
+      const reason = await ctx.prisma.reason.findFirst({
+        where: {
+          id: input.reasonId,
+          companyId: ctx.user.companyId,
+          rule: 'CANCELAMENTO',
+        },
+      });
+
+      if (!reason) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Motivo de cancelamento inválido',
+        });
+      }
+
+      // 5. Cancel the order
+      const updatedOrder = await ctx.prisma.serviceOrder.update({
+        where: { id: input.id },
+        data: {
+          status: 'CANCELADO',
+          cancelledAt: new Date(),
+          cancelledByUserId: user.id,
+          orderHistory: {
+            create: {
+              status: 'CANCELADO',
+              note: `Cancelado por ${user.name}`,
+            }
+          }
+        },
+      });
+
+      // 6. Create cancellation record
+      await ctx.prisma.cancellationRecord.create({
+        data: {
+          orderId: input.id,
+          userId: user.id,
+          reasonId: input.reasonId,
+          notes: input.notes,
+        },
+      });
+
+      // 7. Release dependent orders
+      await releaseDependencies(ctx, input.id);
+
+      // 8. Audit log
+      await ctx.prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'CANCEL_ORDER',
+          entity: 'ServiceOrder',
+          entityId: input.id,
+          changes: { 
+            reasonId: input.reasonId, 
+            notes: input.notes,
+            cancelledBy: user.name,
+          },
+        },
+      });
+
+      return updatedOrder;
     }),
 });

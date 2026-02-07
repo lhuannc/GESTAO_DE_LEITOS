@@ -41,7 +41,7 @@ export interface Bed {
   status: BedStatus;
 }
 
-export type OSStatus = 'BLOQUEADO' | 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDO';
+export type OSStatus = 'BLOQUEADO' | 'PENDENTE' | 'EM_ANDAMENTO' | 'CONCLUIDO' | 'CANCELADO';
 
 export interface Team {
   id: string;
@@ -151,6 +151,37 @@ export interface ServiceOrder {
   updatedAt: string;
   completedAt?: string | null;
   finishedAt?: string; // Legacy
+  cancelledAt?: string | null;
+  cancelledByUserId?: string | null;
+}
+
+export type ReasonRule = 'CANCELAMENTO' | 'FORA_DO_PRAZO';
+
+export interface Reason {
+  id: string;
+  name: string;
+  rule: ReasonRule;
+  companyId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CancellationRecord {
+  id: string;
+  orderId: string;
+  userId: string;
+  reasonId: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface SLAOverdueRecord {
+  id: string;
+  orderId: string;
+  userId: string;
+  reasonId: string;
+  notes?: string;
+  createdAt: string;
 }
 
 export type ViewType = 'DASHBOARD' | 'DASHBOARD_OPERACIONAL' | 'SOLICITAR' | 'ORDENS' | 'CADASTROS' | 'PESQUISA_ACOES';

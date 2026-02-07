@@ -12,6 +12,7 @@ import { sectionsRouter } from './sections';
 import { stepsRouter } from './steps';
 import { configRouter } from './config';
 import { complementItemsRouter } from './complementItems';
+import { reasonsRouter } from './reasons';
 
 /**
  * Main application router
@@ -31,6 +32,7 @@ export const appRouter = router({
   steps: stepsRouter,
   config: configRouter,
   complementItems: complementItemsRouter,
+  reasons: reasonsRouter,
 });
 
 export type AppRouter = typeof appRouter;

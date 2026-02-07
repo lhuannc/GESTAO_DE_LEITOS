@@ -22,7 +22,7 @@
   "dependencies": {
     "@gestao-leitos/types": "file:../types",
     "@gestao-leitos/utils": "file:../utils",
-    "@prisma/client": "^6.2.0",
+    "@prisma/client": "^6.19.2",
     "bcrypt": "^6.0.0",
     "sql.js": "^1.10.3"
   },
