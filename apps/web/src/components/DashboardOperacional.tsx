@@ -129,9 +129,10 @@ const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, order
       groups[order.groupId].push(order);
     });
 
-    // Encontrar fluxos com etapas pendentes/finalização (não completamente concluídos)
+    // Encontrar fluxos com etapas pendentes/em andamento (não completamente finalizados)
+    // Considera CONCLUIDO e CANCELADO como estados finalizados
     const fluxosAtivos = Object.values(groups).filter(group => {
-      return group.some(order => order.status !== 'CONCLUIDO');
+      return group.some(order => order.status !== 'CONCLUIDO' && order.status !== 'CANCELADO');
     });
 
     // Criar mapa de leitos com seus fluxos ativos
@@ -255,7 +256,8 @@ const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, order
       const duration = calculateTimeFromPendingToCompletion(order);
       const formattedDuration = formatDuration(duration);
       const service = services.find(s => s.id === order.serviceTypeId);
-      const subOrderConfig = service?.config?.subOrders?.find((so: any) => so.order === order.step);
+      // Corrigido: acessar subOrders pelo índice ao invés de find() com propriedade inexistente
+      const subOrderConfig = service?.config?.subOrders?.[order.step];
       const step = subOrderConfig?.stepId ? steps.find(s => s.id === subOrderConfig.stepId) : null;
       const slaMinutes = step?.slaMinutes;
       const foraDoPrazo = !!(slaMinutes && duration > slaMinutes && order.status !== 'BLOQUEADO');

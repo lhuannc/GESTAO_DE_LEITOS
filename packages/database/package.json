@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "main": "./src/backend.ts",
-  "types": "./src/backend.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "scripts": {
     "migrate": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
@@ -14,10 +14,8 @@
     "generate": "prisma generate"
   },
   "exports": {
-    ".": "./src/backend.ts",
-    "./client": "./src/client.ts",
-    "./database": "./src/database.ts",
-    "./constants": "./src/constants.ts"
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts"
   },
   "dependencies": {
     "@gestao-leitos/types": "file:../types",

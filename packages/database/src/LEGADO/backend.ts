@@ -245,26 +245,34 @@ class BackendDB {
 
         const orderId = `so-${Date.now()}-${newIndex}`;
 
+        const now = new Date().toISOString();
         const order: ServiceOrder = {
           id: orderId,
           groupId,
           bedId: requestData.bedId,
-          serviceId: requestData.serviceId,
-          requesterUserId: requestData.userId,
+          serviceTypeId: requestData.serviceId,
+          serviceId: requestData.serviceId, // Legacy
+          requestedById: requestData.userId,
+          requesterUserId: requestData.userId, // Legacy
           subServiceName: stepName,
           step: newIndex, // Usar novo índice sequencial
-          currentActionId: '',
-          responsibleUserId: null,
-          assignedTeamId: stepTeamId,
-          companyId: requestData.companyId,
-          requestedAt: new Date().toISOString(),
+          responsibleUserId: null, // Legacy
+          assignedToUserId: null,
+          assignedToTeamId: stepTeamId,
+          priority: 0,
           status: effectiveStatus,
           items: processItems(originalIndex), // Usar índice original para buscar itens
           dependsOnOrderIds: dependsOnOrderIds,
+          createdAt: now,
+          requestedAt: now, // Legacy
+          updatedAt: now,
+          completedAt: null,
+          cancelledAt: null,
+          cancelledByUserId: null,
           history: [{
             status: effectiveStatus,
             userId: requestData.userId,
-            timestamp: new Date().toISOString(),
+            timestamp: now,
             note: shouldBlock 
               ? 'Aguardando conclusão de dependências.' 
               : 'Fluxo iniciado.'
@@ -354,25 +362,34 @@ class BackendDB {
     } else {
       // Single Service Order Case
       const orderId = `so-${Date.now()}`;
+      const now = new Date().toISOString();
       const order: ServiceOrder = {
         id: orderId,
         groupId,
         bedId: requestData.bedId,
-        serviceId: requestData.serviceId,
-        requesterUserId: requestData.userId,
+        serviceTypeId: requestData.serviceId,
+        serviceId: requestData.serviceId, // Legacy
+        requestedById: requestData.userId,
+        requesterUserId: requestData.userId, // Legacy
         step: 0,
         subServiceName: service.name,
-        currentActionId: '',
-        responsibleUserId: null,
-        companyId: requestData.companyId,
-        requestedAt: new Date().toISOString(),
+        responsibleUserId: null, // Legacy
+        assignedToUserId: null,
+        assignedToTeamId: null,
+        priority: 0,
         status: 'PENDENTE',
         items: processItems(0),
         dependsOnOrderIds: [],
+        createdAt: now,
+        requestedAt: now, // Legacy
+        updatedAt: now,
+        completedAt: null,
+        cancelledAt: null,
+        cancelledByUserId: null,
         history: [{
           status: 'PENDENTE',
           userId: requestData.userId,
-          timestamp: new Date().toISOString(),
+          timestamp: now,
           note: 'Solicitação criada.'
         }]
       };
