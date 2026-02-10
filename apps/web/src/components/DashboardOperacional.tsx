@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Bed, ServiceOrder, ServiceType, Step, BedStatusConfig, User } from '@gestao-leitos/types';
 import { Layers, Clock, CheckCircle2, Circle, PlayCircle, Lock, AlertCircle, X, Hash, MapPin, User as UserIcon, Timer as TimerIcon, Package, Users as SilhouetteIcon } from 'lucide-react';
 
@@ -95,7 +95,13 @@ const calculateTimeFromPendingToCompletion = (order: ServiceOrder): number => {
   if (!primeiroPendente) return 0;
 
   const inicioPendente = new Date(primeiroPendente.timestamp);
-  const fim = order.finishedAt ? new Date(order.finishedAt) : new Date();
+  
+  // Use completedAt, cancelledAt, or current time for ongoing orders
+  const fim = order.completedAt 
+    ? new Date(order.completedAt) 
+    : order.cancelledAt 
+      ? new Date(order.cancelledAt)
+      : new Date(); // Use current time for real-time updates
 
   return (fim.getTime() - inicioPendente.getTime()) / (1000 * 60); // em minutos
 };
@@ -103,6 +109,16 @@ const calculateTimeFromPendingToCompletion = (order: ServiceOrder): number => {
 const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, orders, services, steps, users, bedStatusConfigs = [] }) => {
   const [selectedBed, setSelectedBed] = useState<{ bed: Bed; orders: ServiceOrder[] } | null>(null);
   const [selectedAction, setSelectedAction] = useState<ServiceOrder | null>(null);
+  const [now, setNow] = useState(Date.now());
+
+  // Update timer every second for real-time duration updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Agrupar ordens por groupId e leito
   const leitosComFluxos = useMemo(() => {
@@ -231,6 +247,7 @@ const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, order
   }, [leitosComFluxos, leitosDisponiveis, bedDependencyGroups]);
 
   // Pre-calculate data for items in groups to avoid heavy calculations in render
+  // Recalculates every second due to 'now' dependency for real-time updates
   const processedOrdersData = useMemo(() => {
     const data: Record<string, { duration: number, formattedDuration: string, foraDoPrazo: boolean }> = {};
 
@@ -246,7 +263,7 @@ const DashboardOperacional: React.FC<DashboardOperacionalProps> = ({ beds, order
     });
 
     return data;
-  }, [orders, services, steps]);
+  }, [orders, services, steps, now]); // Added 'now' to force recalculation every second
 
   // Index bed to group for O(1) lookup
   const bedToGroupMap = useMemo(() => {

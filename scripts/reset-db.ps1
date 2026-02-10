@@ -12,6 +12,7 @@ if ($confirmation -ne "SIM") {
 
 Write-Host ""
 Write-Host "🗄️  Resetando banco de dados..." -ForegroundColor Yellow
+Write-Host ""
 
 Set-Location packages/database
 
@@ -24,6 +25,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+Write-Host ""
 Write-Host "✅ Banco resetado e seeds executados" -ForegroundColor Green
 Set-Location ../..
 

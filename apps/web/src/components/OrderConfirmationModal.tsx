@@ -63,10 +63,10 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
         {/* Ações Criadas */}
         <div className="mb-6">
           <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-            <Layers size={14} /> Ações Criadas ({orderData.actions.length})
+            <Layers size={14} /> Ações Criadas ({orderData.actions?.length || 0})
           </h4>
           <div className="space-y-2">
-            {orderData.actions.map((action, idx) => (
+            {(orderData.actions || []).map((action, idx) => (
               <div key={action.id} className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg">
                 <div className="w-8 h-8 bg-sky-500 text-white rounded-full flex items-center justify-center font-black text-sm shrink-0">
                   {idx + 1}
@@ -87,7 +87,7 @@ const OrderConfirmationModal: React.FC<OrderConfirmationModalProps> = ({
         </div>
 
         {/* Ordem de Dependências */}
-        {orderData.actions.some(a => a.dependencies && a.dependencies.length > 0) && (
+        {orderData.actions?.some(a => a.dependencies && a.dependencies.length > 0) && (
           <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4">
             <h4 className="text-xs font-black text-amber-700 uppercase tracking-widest mb-2">
               ⚠️ Ordem de Execução

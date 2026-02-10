@@ -581,14 +581,14 @@ export const ordersRouter = router({
       id: z.string(),
       reasonId: z.string(),
       notes: z.string().optional(),
-      userLogin: z.string(),
+      userCpf: z.string(),
       userPassword: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // 1. Validate user credentials
+      // 1. Validate user credentials using CPF
       const user = await ctx.prisma.user.findFirst({
         where: {
-          login: input.userLogin,
+          cpf: input.userCpf,
           companyId: ctx.user.companyId,
         },
       });

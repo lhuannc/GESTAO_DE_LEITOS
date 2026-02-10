@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 
 // Environment-based configuration
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production-min-32-chars';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'; // 7 days
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d'; // 30 days
 
 export interface JWTPayload {
   userId: string;
@@ -15,10 +15,12 @@ export interface JWTPayload {
  * Sign a JWT token with user information
  */
 export function signToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
-  return jwt.sign(payload, JWT_SECRET, { 
+  // Type assertion needed because @types/jsonwebtoken may have strict typing
+  // but the library accepts both string ('30d') and number for expiresIn
+  return jwt.sign(payload, JWT_SECRET, {
     expiresIn: JWT_EXPIRES_IN,
     issuer: 'gestao-leitos-api',
-  });
+  } as any);
 }
 
 /**
@@ -52,7 +54,7 @@ export function getCookieOptions() {
     httpOnly: true, // Cannot be accessed by JavaScript (XSS protection)
     secure: isProduction, // HTTPS only in production
     sameSite: 'lax' as const, // CSRF protection
-    maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
+    maxAge: 30 * 24 * 60 * 60, // 30 days in seconds
     path: '/', // Available for all routes
     domain: process.env.COOKIE_DOMAIN, // Optional: set for subdomain sharing
   };

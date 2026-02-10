@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  LayoutDashboard, ClipboardPlus, Settings, Kanban, LogOut, Menu, X, Loader2, RefreshCw, ChevronDown, ChevronRight, TrendingUp, Search
+  LayoutDashboard, ClipboardPlus, Settings, Kanban, LogOut, Menu, X, Loader2, RefreshCw, ChevronDown, ChevronRight, TrendingUp, Search, XCircle
 } from 'lucide-react';
 import { ViewType } from '@gestao-leitos/types';
 import Dashboard from './components/Dashboard';
@@ -21,18 +21,56 @@ const MemoizedRegistrationManager = React.memo(RegistrationManager);
 const MemoizedActionsList = React.memo(ActionsList);
 
 const App: React.FC = () => {
-  const { currentUser, setCurrentUser, logout } = useAuth();
+  const { currentUser, setCurrentUser } = useAuth();
   const [activeView, setActiveView] = useState<ViewType>('DASHBOARD');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const utils = trpc.useContext();
 
+  // Auto-login: Check if user is already authenticated via cookie
+  const { data: sessionUser, isLoading: sessionLoading } = trpc.auth.me.useQuery(undefined, {
+    enabled: !currentUser, // Only check if not already logged in
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  // Logout mutation to clear cookie on backend
+  const logoutMutation = trpc.auth.logout.useMutation();
+
+  // Auto-login effect: Set user from session if available
+  useEffect(() => {
+    if (sessionUser && !currentUser) {
+      setCurrentUser(sessionUser as any);
+    }
+  }, [sessionUser, currentUser, setCurrentUser]);
+
+  // Logout handler - clears session and redirects to login
+  const handleLogout = async () => {
+    try {
+      // Clear user state (triggers redirect to login)
+      setCurrentUser(null);
+      
+      // Destroy the cookie on backend
+      await logoutMutation.mutateAsync();
+      
+      // Reset view to dashboard for next login
+      setActiveView('DASHBOARD');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Even if backend fails, ensure user is logged out locally
+      setCurrentUser(null);
+      setActiveView('DASHBOARD');
+    }
+  };
+
   // Fetch all data using tRPC
   const { data: beds = [], isLoading: bedsLoading, refetch: refetchBeds } = trpc.leitos.list.useQuery({}, {
     enabled: !!currentUser,
+    refetchInterval: 3000, // Auto-refresh every 3 seconds for real-time updates
   });
   
   const { data: orders = [], isLoading: ordersLoading, refetch: refetchOrders } = trpc.orders.list.useQuery({}, {
     enabled: !!currentUser,
+    refetchInterval: 3000, // Auto-refresh every 3 seconds for real-time updates
   });
 
   const { data: services = [], isLoading: servicesLoading, refetch: refetchServices } = trpc.services.list.useQuery(undefined, {
@@ -41,6 +79,7 @@ const App: React.FC = () => {
 
   const { data: users = [], isLoading: usersLoading, refetch: refetchUsers } = trpc.users.list.useQuery(undefined, {
     enabled: !!currentUser,
+    refetchInterval: 10000, // Auto-refresh every 10 seconds
   });
 
   const { data: teams = [], isLoading: teamsLoading, refetch: refetchTeams } = trpc.teams.list.useQuery(undefined, {
@@ -71,6 +110,10 @@ const App: React.FC = () => {
     enabled: !!currentUser,
   });
 
+  const { data: reasons = [], isLoading: reasonsLoading, refetch: refetchReasons } = trpc.reasons.list.useQuery(undefined, {
+    enabled: !!currentUser,
+  });
+
   // No longer using legacy standalone actions array
 
   // Mutations for RegistrationManager
@@ -85,6 +128,7 @@ const App: React.FC = () => {
     steps: trpc.steps.delete.useMutation(),
     complementItems: trpc.config.deleteComplementItem.useMutation(),
     bedStatusConfigs: trpc.config.deleteBedStatusConfig.useMutation(),
+    reasons: trpc.reasons.delete.useMutation(),
   };
 
   const saveMutation = {
@@ -98,10 +142,11 @@ const App: React.FC = () => {
     steps: { create: trpc.steps.create.useMutation(), update: trpc.steps.update.useMutation() },
     complementItems: { create: trpc.config.createComplementItem.useMutation(), update: trpc.config.updateComplementItem.useMutation() },
     bedStatusConfigs: { create: trpc.config.createBedStatusConfig.useMutation(), update: trpc.config.updateBedStatusConfig.useMutation() },
+    reasons: { create: trpc.reasons.create.useMutation(), update: trpc.reasons.update.useMutation() },
   };
 
   const loading = bedsLoading || ordersLoading || servicesLoading || usersLoading || teamsLoading || 
-                  companiesLoading || unitsLoading || sectorsLoading || stepsLoading || itemsLoading || statusLoading;
+                  companiesLoading || unitsLoading || sectorsLoading || stepsLoading || itemsLoading || statusLoading || reasonsLoading;
   
   // Track if we have completed at least one load of basic data
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -118,7 +163,7 @@ const App: React.FC = () => {
     try {
       await Promise.all([
         refetchBeds(), refetchOrders(), refetchServices(), refetchUsers(), refetchTeams(),
-        refetchCompanies(), refetchUnits(), refetchSectors(), refetchSteps(), refetchItems(), refetchStatus()
+        refetchCompanies(), refetchUnits(), refetchSectors(), refetchSteps(), refetchItems(), refetchStatus(), refetchReasons()
       ]);
     } finally {
       setSyncing(false);
@@ -159,6 +204,9 @@ const App: React.FC = () => {
         case 'bedStatusConfigs':
           await Promise.all([utils.config.listBedStatusConfigs.invalidate(), utils.leitos.list.invalidate()]);
           break;
+        case 'reasons':
+          await utils.reasons.list.invalidate();
+          break;
         default:
           await handleRefetchAll();
       }
@@ -180,17 +228,6 @@ const App: React.FC = () => {
 
   const handleLogin = (user: any) => {
     setCurrentUser(user);
-  };
-
-  const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
-      logout(); // Clear local state
-      setActiveView('DASHBOARD');
-    },
-  });
-
-  const handleLogout = () => {
-    logoutMutation.mutate();
   };
 
   const handleUpdateOrder = async () => {
@@ -244,6 +281,17 @@ const App: React.FC = () => {
     );
   }
 
+  // Show loading while checking for existing session
+  if (sessionLoading && !currentUser) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-900 text-white">
+        <Loader2 className="w-12 h-12 text-sky-500 animate-spin mb-4" />
+        <p className="text-slate-400 font-medium animate-pulse">Verificando sessão...</p>
+      </div>
+    );
+  }
+
+  // No valid session - show login
   if (!currentUser) {
     return <Login onLoginSuccess={handleLogin} />;
   }
@@ -308,7 +356,7 @@ const App: React.FC = () => {
             {activeView === 'PESQUISA_ACOES' && <MemoizedActionsList orders={orders} services={services} beds={beds} sectors={sectors} users={users} steps={steps} />}
             {activeView === 'CADASTROS' && currentUser.permissions.isAdmin && (
               <MemoizedRegistrationManager 
-                currentUser={currentUser} companies={companies} units={units} sectors={sectors} beds={beds} services={services} users={users} teams={teams} complementItems={complementItems} steps={steps} bedStatusConfigs={bedStatusConfigs}
+                currentUser={currentUser} companies={companies} units={units} sectors={sectors} beds={beds} services={services} users={users} teams={teams} complementItems={complementItems} steps={steps} bedStatusConfigs={bedStatusConfigs} reasons={reasons}
                 onSave={handleSaveRegistry} onDelete={handleDeleteRegistry}
               />
             )}

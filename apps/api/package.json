@@ -14,8 +14,8 @@
     "@gestao-leitos/database": "file:../../packages/database",
     "@gestao-leitos/types": "file:../../packages/types",
     "@trpc/server": "^11.0.0",
-    "@types/jsonwebtoken": "^9.0.10",
     "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.0",
     "jsonwebtoken": "^9.0.3",
@@ -24,6 +24,8 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.14.0",
     "tsx": "^4.19.2",
     "typescript": "~5.8.2"

@@ -1,16 +1,16 @@
 
 import React, { useState, useMemo } from 'react';
-import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, OSStatus, SubOrderConfig, Team, ComplementItem, Step, BedStatusConfig } from '@gestao-leitos/types';
+import { Company, Unit, Sector, Bed, ServiceType, ActionStatus, User, OSStatus, SubOrderConfig, Team, ComplementItem, Step, BedStatusConfig, Reason } from '@gestao-leitos/types';
 import {
   Building2, Hospital, Layers, Bed as BedIcon, Settings,
   Users, Plus, Trash2, Edit2, X, Save,
   ListPlus, Info, Users2, ArrowDown, ArrowUp, Lock,
   Package, DollarSign, CheckSquare, Link as LinkIcon,
-  UserCheck, Mail, ShieldCheck, Fingerprint, CreditCard, Clock, Palette
+  UserCheck, Mail, ShieldCheck, Fingerprint, CreditCard, Clock, Palette, XCircle
 } from 'lucide-react';
 import { maskCPF, unmaskCPF, md5 } from '@gestao-leitos/utils';
 
-type TabId = 'empresa' | 'unidade' | 'setor' | 'leito' | 'servico' | 'usuario' | 'equipe' | 'insumo' | 'etapa' | 'status';
+type TabId = 'empresa' | 'unidade' | 'setor' | 'leito' | 'servico' | 'usuario' | 'equipe' | 'insumo' | 'etapa' | 'status' | 'motivos';
 
 interface RegistrationManagerProps {
   currentUser: User;
@@ -25,6 +25,7 @@ interface RegistrationManagerProps {
   complementItems?: ComplementItem[]; // Adicionado via DB
   steps?: Step[]; // Etapas cadastradas
   bedStatusConfigs?: BedStatusConfig[]; // Configurações de status
+  reasons?: Reason[]; // Motivos de cancelamento e SLA
   onSave: (type: string, item: any) => Promise<void>;
   onDelete: (type: string, id: string) => Promise<void>;
 }
@@ -41,6 +42,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
   complementItems = [],
   steps = [],
   bedStatusConfigs = [],
+  reasons = [],
   onSave,
   onDelete
 }) => {
@@ -62,6 +64,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
     { id: 'status' as TabId, label: 'Status de Leito', icon: <Palette size={18} />, module: 'bedStatusConfig' },
     { id: 'servico' as TabId, label: 'Fluxos (Serviços)', icon: <Settings size={18} />, module: 'service' },
     { id: 'usuario' as TabId, label: 'Usuários', icon: <Users size={18} />, module: 'user' },
+    { id: 'motivos' as TabId, label: 'Motivos', icon: <XCircle size={18} />, module: 'reason' },
   ], []);
 
   const filteredItems = useMemo(() => {
@@ -78,9 +81,10 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       case 'insumo': return complementItems.filter(i => isAdmin || i.companyId === cid);
       case 'etapa': return steps.filter(s => isAdmin || s.companyId === cid);
       case 'status': return bedStatusConfigs.filter(s => isAdmin || s.companyId === cid);
+      case 'motivos': return reasons.filter(r => isAdmin || r.companyId === cid);
       default: return [];
     }
-  }, [activeTab, companies, units, sectors, beds, services, users, teams, complementItems, steps, bedStatusConfigs, currentUser]);
+  }, [activeTab, companies, units, sectors, beds, services, users, teams, complementItems, steps, bedStatusConfigs, reasons, currentUser]);
 
   const getAssociationsForItem = (itemId: string) => {
     const associations: { serviceName: string; stepName: string }[] = [];
@@ -110,6 +114,8 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
       baseData.description = '';
     } else if (activeTab === 'status') {
       baseData.color = 'bg-slate-500';
+    } else if (activeTab === 'motivos') {
+      baseData.rule = 'CANCELAMENTO';
     } else if (activeTab === 'equipe') {
       baseData.userIds = [];
     } else if (activeTab === 'usuario') {
@@ -175,7 +181,7 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
     const typeMap: Record<TabId, string> = {
       empresa: 'companies', unidade: 'units', setor: 'sectors', leito: 'beds',
       servico: 'services', usuario: 'users', equipe: 'teams', insumo: 'complementItems',
-      etapa: 'steps', status: 'bedStatusConfigs'
+      etapa: 'steps', status: 'bedStatusConfigs', motivos: 'reasons'
     };
 
     try {
@@ -312,6 +318,15 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                             )}
                           </div>
                         </>
+                      )}
+                      {activeTab === 'motivos' && (
+                        <div className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-widest">
+                          {item.rule === 'CANCELAMENTO' ? (
+                            <span className="px-2 py-1 bg-rose-100 text-rose-700 rounded-lg">Cancelamento</span>
+                          ) : (
+                            <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-lg">Fora do Prazo</span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -784,6 +799,23 @@ const RegistrationManager: React.FC<RegistrationManagerProps> = ({
                   )}
 
 
+                </div>
+              )}
+
+              {activeTab === 'motivos' && (
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <XCircle size={14} className="text-sky-500" /> Regra Associada
+                  </label>
+                  <select
+                    value={formData.rule || 'CANCELAMENTO'}
+                    onChange={(e) => setFormData({ ...formData, rule: e.target.value })}
+                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-sky-500 outline-none text-sm font-bold text-slate-700"
+                    required
+                  >
+                    <option value="CANCELAMENTO">Cancelamento</option>
+                    <option value="FORA_DO_PRAZO">Fora do Prazo</option>
+                  </select>
                 </div>
               )}
 

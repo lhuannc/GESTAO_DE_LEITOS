@@ -27,10 +27,13 @@ import {
   ArrowRight,
   Timer,
   Hash,
-  User as SilhouetteIcon
+  User as SilhouetteIcon,
+  XCircle
 } from 'lucide-react';
 import { trpc } from '../lib/trpc';
 import QRCodeScanner from './QRCodeScanner';
+import CancelOrderModal from './CancelOrderModal';
+import SLAOverdueModal from './SLAOverdueModal';
 
 interface ServiceOrdersKanbanProps {
   orders: ServiceOrder[];
@@ -50,7 +53,8 @@ const COLUMNS: { id: OSStatus, label: string, color: string, icon: React.ReactNo
   { id: 'BLOQUEADO', label: 'Bloqueado', color: 'bg-slate-200 text-slate-600', icon: <Lock size={14} /> },
   { id: 'PENDENTE', label: 'Pendente', color: 'bg-amber-100 text-amber-600', icon: <AlertCircle size={14} /> },
   { id: 'EM_ANDAMENTO', label: 'Em Andamento', color: 'bg-sky-100 text-sky-600', icon: <Play size={14} /> },
-  { id: 'CONCLUIDO', label: 'Concluído', color: 'bg-emerald-100 text-emerald-600', icon: <CheckCircle size={14} /> }
+  { id: 'CONCLUIDO', label: 'Concluído', color: 'bg-emerald-100 text-emerald-600', icon: <CheckCircle size={14} /> },
+  { id: 'CANCELADO', label: 'Cancelado', color: 'bg-rose-100 text-rose-600', icon: <XCircle size={14} /> }
 ];
 
 const formatDuration = (ms: number): string => {
@@ -84,6 +88,13 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   const [qrScanAttempts, setQrScanAttempts] = useState(0);
   const [showLoginFallback, setShowLoginFallback] = useState(false);
   const [loginCredentials, setLoginCredentials] = useState({ login: '', password: '' });
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showSLAModal, setShowSLAModal] = useState(false);
+
+  // Fetch reasons for modals
+  const reasonsQuery = trpc.reasons.list.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
 
   // tRPC mutation for updating order status
   const updateStatusMutation = trpc.orders.updateStatus.useMutation({
@@ -101,6 +112,17 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   const unassignMutation = trpc.orders.unassign.useMutation({
     onSuccess: (updatedOrder) => {
       onUpdateOrder(updatedOrder as any);
+    },
+  });
+
+  const cancelMutation = trpc.orders.cancel.useMutation({
+    onSuccess: (updatedOrder) => {
+      onUpdateOrder(updatedOrder as any);
+      setShowCancelModal(false);
+      setEditingOrder(null);
+    },
+    onError: (error) => {
+      alert(`Erro ao cancelar ordem: ${error.message}`);
     },
   });
 
@@ -262,16 +284,66 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
 
   const handleConfirmComplete = async () => {
     if (!editingOrder) return;
+    
+    // Check if SLA is violated - this is a simple client-side check
+    // The server will also validate this
+    const createdAt = new Date(editingOrder.createdAt).getTime();
+    const now = Date.now();
+    const elapsedMinutes = (now - createdAt) / (1000 * 60);
+    
+    // Get service type to check SLA
+    const serviceType = services.find(s => s.id === editingOrder.serviceTypeId);
+    const currentStep = serviceType?.steps?.[editingOrder.step || 0];
+    const slaMinutes = currentStep?.slaMinutes;
+    
+    const isSLAViolated = slaMinutes && elapsedMinutes > slaMinutes;
+    
+    if (isSLAViolated) {
+      // Show SLA modal
+      setIsConfirmingItems(false);
+      setShowSLAModal(true);
+    } else {
+      // Complete directly
+      try {
+        await updateStatusMutation.mutateAsync({
+          id: editingOrder.id,
+          status: 'CONCLUIDO',
+        });
+        setEditingOrder(null);
+        setIsConfirmingItems(false);
+      } catch (error: any) {
+        alert(`Erro ao concluir ordem: ${error.message}`);
+      }
+    }
+  };
+
+  const handleSLAConfirm = async (reasonId: string, notes?: string) => {
+    if (!editingOrder) return;
     try {
       await updateStatusMutation.mutateAsync({
         id: editingOrder.id,
         status: 'CONCLUIDO',
+        slaOverdueReasonId: reasonId,
+        slaOverdueNotes: notes,
       });
       setEditingOrder(null);
-      setIsConfirmingItems(false);
+      setShowSLAModal(false);
     } catch (error: any) {
       alert(`Erro ao concluir ordem: ${error.message}`);
     }
+  };
+
+  const handleCancelConfirm = async (data: {
+    reasonId: string;
+    notes?: string;
+    userLogin: string;
+    userPassword: string;
+  }) => {
+    if (!editingOrder) return;
+    await cancelMutation.mutateAsync({
+      id: editingOrder.id,
+      ...data,
+    });
   };
 
   const getDurations = (order: ServiceOrder) => {
@@ -284,6 +356,8 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
       const startTime = new Date(order.createdAt || order.requestedAt || Date.now()).getTime();
       const endTime = order.status === 'CONCLUIDO' 
         ? new Date(order.completedAt || order.finishedAt || Date.now()).getTime()
+        : order.status === 'CANCELADO'
+        ? new Date(order.cancelledAt || Date.now()).getTime()
         : now;
       const totalTime = endTime - startTime;
       return { statusTimes, totalTime, history: [] };
@@ -295,13 +369,19 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
       const start = new Date(history[i].timestamp || history[i].createdAt).getTime();
       const end = i < history.length - 1
         ? new Date(history[i + 1].timestamp || history[i + 1].createdAt).getTime()
-        : (order.status === 'CONCLUIDO' ? new Date(order.completedAt || order.finishedAt || Date.now()).getTime() : now);
+        : (order.status === 'CONCLUIDO' 
+          ? new Date(order.completedAt || order.finishedAt || Date.now()).getTime() 
+          : order.status === 'CANCELADO'
+          ? new Date(order.cancelledAt || Date.now()).getTime()
+          : now);
       statusTimes[history[i].status] += (end - start);
     }
     
     const startTime = new Date(order.createdAt || order.requestedAt || Date.now()).getTime();
     const endTime = order.status === 'CONCLUIDO'
       ? new Date(order.completedAt || order.finishedAt || Date.now()).getTime()
+      : order.status === 'CANCELADO'
+      ? new Date(order.cancelledAt || Date.now()).getTime()
       : now;
     const totalTime = endTime - startTime;
     
@@ -635,6 +715,15 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                       <UserMinus size={14} /> <span>Forçar Remoção de Executor</span>
                     </button>
                   )}
+
+                  {editingOrder.status !== 'CONCLUIDO' && editingOrder.status !== 'CANCELADO' && (
+                    <button
+                      onClick={() => setShowCancelModal(true)}
+                      className="w-full bg-rose-50 text-rose-600 py-3 rounded-2xl hover:bg-rose-100 transition-all text-[10px] font-black uppercase tracking-widest border border-rose-200 flex items-center justify-center gap-2"
+                    >
+                      <XCircle size={14} /> <span>Cancelar Ação</span>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -733,6 +822,24 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showCancelModal && editingOrder && (
+        <CancelOrderModal
+          onConfirm={handleCancelConfirm}
+          onClose={() => setShowCancelModal(false)}
+          reasons={reasonsQuery.data || []}
+          isLoading={cancelMutation.isLoading}
+        />
+      )}
+
+      {showSLAModal && editingOrder && (
+        <SLAOverdueModal
+          onConfirm={handleSLAConfirm}
+          onClose={() => setShowSLAModal(false)}
+          reasons={reasonsQuery.data || []}
+          isLoading={updateStatusMutation.isLoading}
+        />
       )}
     </div>
   );

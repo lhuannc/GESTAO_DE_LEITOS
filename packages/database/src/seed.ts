@@ -243,10 +243,44 @@ async function main() {
 
   console.log('✅ Complement items created');
 
+  // Create default reasons
+  await Promise.all([
+    prisma.reason.create({
+      data: {
+        name: 'Paciente solicitou cancelamento',
+        rule: 'CANCELAMENTO',
+        companyId: company.id,
+      },
+    }),
+    prisma.reason.create({
+      data: {
+        name: 'Erro na solicitação',
+        rule: 'CANCELAMENTO',
+        companyId: company.id,
+      },
+    }),
+    prisma.reason.create({
+      data: {
+        name: 'Falta de material',
+        rule: 'FORA_DO_PRAZO',
+        companyId: company.id,
+      },
+    }),
+    prisma.reason.create({
+      data: {
+        name: 'Equipe sobrecarregada',
+        rule: 'FORA_DO_PRAZO',
+        companyId: company.id,
+      },
+    }),
+  ]);
+
+  console.log('✅ Default reasons created');
+
   console.log('\n🎉 Seed completed successfully!');
   console.log('\n📝 Login credentials:');
-  console.log('   Admin: CPF 111.111.111-11 / Senha: admin');
-  console.log('   Operacional: CPF 222.222.222-22 / Senha: operacional');
+  console.log('   Admin: Login admin / Senha: admin');
+  console.log('   Operacional: Login operador / Senha: operacional');
 }
 
 main()

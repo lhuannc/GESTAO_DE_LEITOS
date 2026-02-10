@@ -38,7 +38,8 @@ const OS_COLORS = {
   BLOQUEADO: '#94a3b8',
   PENDENTE: '#fbbf24',
   EM_ANDAMENTO: '#38bdf8',
-  CONCLUIDO: '#34d399'
+  CONCLUIDO: '#34d399',
+  CANCELADO: '#f43f5e'
 };
 
 const getHexFromTailwind = (className: string) => {
@@ -73,7 +74,8 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
       BLOQUEADO: { count: 0, durations: [] },
       PENDENTE: { count: 0, durations: [] },
       EM_ANDAMENTO: { count: 0, durations: [] },
-      CONCLUIDO: { count: 0, durations: [] }
+      CONCLUIDO: { count: 0, durations: [] },
+      CANCELADO: { count: 0, durations: [] }
     };
 
     orders.forEach(order => {
@@ -108,7 +110,8 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
       BLOQUEADO: [],
       PENDENTE: [],
       EM_ANDAMENTO: [],
-      CONCLUIDO: []
+      CONCLUIDO: [],
+      CANCELADO: []
     };
 
     if (!order.history || !Array.isArray(order.history) || order.history.length === 0) return tempos;
@@ -453,32 +456,32 @@ const Dashboard: React.FC<DashboardProps> = ({ beds, orders, users, services, be
         <h4 className="text-[10px] font-black text-slate-800 mb-6 uppercase tracking-[0.2em] flex items-center gap-2">
           <TrendingUp size={14} className="text-sky-500" /> Ações por Status
         </h4>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+        <div className="grid grid-cols-5 gap-3">
           {etapasPorStatus.map((stat) => (
-            <div key={stat.status} className="bg-slate-50 border border-slate-200 rounded-xl p-4 md:p-6">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            <div key={stat.status} className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                   {stat.status.replace('_', ' ')}
                 </p>
                 <div className={`w-2 h-2 rounded-full`} style={{ backgroundColor: OS_COLORS[stat.status] }} />
               </div>
               <div className="space-y-2">
                 <div>
-                  <p className="text-[8px] md:text-[9px] text-slate-500 font-bold uppercase">Quantidade</p>
-                  <h3 className="text-2xl md:text-3xl font-black text-slate-800">{stat.quantidade}</h3>
+                  <p className="text-[8px] text-slate-500 font-bold uppercase">Quantidade</p>
+                  <h3 className="text-2xl font-black text-slate-800">{stat.quantidade}</h3>
                 </div>
-                <div className="pt-2 border-t border-slate-200 space-y-2">
+                <div className="pt-2 border-t border-slate-200 space-y-1">
                   <div>
-                    <p className="text-[8px] md:text-[9px] text-slate-500 font-bold uppercase">Tempo Médio</p>
-                    <p className="text-xs md:text-sm font-black text-sky-600 flex items-center gap-1">
-                      <Clock size={11} />
+                    <p className="text-[8px] text-slate-500 font-bold uppercase">Tempo Médio</p>
+                    <p className="text-xs font-black text-sky-600 flex items-center gap-1">
+                      <Clock size={10} />
                       {stat.tempoMedioFormatado}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[8px] md:text-[9px] text-slate-500 font-bold uppercase">Tempo Máximo</p>
-                    <p className="text-xs md:text-sm font-black text-rose-600 flex items-center gap-1">
-                      <Clock size={11} />
+                    <p className="text-[8px] text-slate-500 font-bold uppercase">Tempo Máximo</p>
+                    <p className="text-xs font-black text-rose-600 flex items-center gap-1">
+                      <Clock size={10} />
                       {stat.tempoMaximoFormatado}
                     </p>
                   </div>
