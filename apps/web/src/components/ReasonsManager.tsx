@@ -104,7 +104,7 @@ const ReasonsManager: React.FC = () => {
     );
   };
 
-  const isLoading = createMutation.isLoading || updateMutation.isLoading || deleteMutation.isLoading;
+  const isLoading = createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
   return (
     <div className="space-y-6 p-6">
@@ -249,7 +249,7 @@ const ReasonsManager: React.FC = () => {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => handleEdit(reason)}
+                        onClick={() => handleEdit(reason as Reason)}
                         className="px-4 py-2 bg-sky-100 text-sky-700 rounded-lg font-bold text-xs hover:bg-sky-200 transition-colors flex items-center gap-1.5"
                         disabled={isLoading}
                       >

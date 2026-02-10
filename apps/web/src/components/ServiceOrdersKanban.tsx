@@ -829,7 +829,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
           onConfirm={handleCancelConfirm}
           onClose={() => setShowCancelModal(false)}
           reasons={reasonsQuery.data || []}
-          isLoading={cancelMutation.isLoading}
+          isPending={cancelMutation.isPending}
         />
       )}
 
@@ -838,7 +838,7 @@ const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
           onConfirm={handleSLAConfirm}
           onClose={() => setShowSLAModal(false)}
           reasons={reasonsQuery.data || []}
-          isLoading={updateStatusMutation.isLoading}
+          isPending={updateStatusMutation.isPending}
         />
       )}
     </div>

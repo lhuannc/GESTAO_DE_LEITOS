@@ -6,14 +6,14 @@ interface SLAOverdueModalProps {
   onConfirm: (reasonId: string, notes?: string) => Promise<void>;
   onClose: () => void;
   reasons: Reason[];
-  isLoading?: boolean;
+  isPending?: boolean;
 }
 
 const SLAOverdueModal: React.FC<SLAOverdueModalProps> = ({
   onConfirm,
   onClose,
   reasons,
-  isLoading = false
+  isPending = false
 }) => {
   const [reasonId, setReasonId] = useState('');
   const [notes, setNotes] = useState('');
@@ -51,7 +51,7 @@ const SLAOverdueModal: React.FC<SLAOverdueModalProps> = ({
           <button 
             onClick={onClose} 
             className="text-slate-400 hover:text-slate-600 transition-colors"
-            disabled={isLoading}
+            disabled={isPending}
           >
             <X size={20} />
           </button>
@@ -75,7 +75,7 @@ const SLAOverdueModal: React.FC<SLAOverdueModalProps> = ({
               value={reasonId}
               onChange={(e) => setReasonId(e.target.value)}
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none text-sm font-bold text-slate-700"
-              disabled={isLoading}
+              disabled={isPending}
               required
             >
               <option value="">Selecione um motivo</option>
@@ -103,7 +103,7 @@ const SLAOverdueModal: React.FC<SLAOverdueModalProps> = ({
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none text-sm font-medium text-slate-700 resize-none"
               rows={3}
               placeholder="Detalhes adicionais sobre o atraso..."
-              disabled={isLoading}
+              disabled={isPending}
             />
           </div>
         </div>
@@ -113,20 +113,20 @@ const SLAOverdueModal: React.FC<SLAOverdueModalProps> = ({
           <button
             onClick={onClose}
             className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors"
-            disabled={isLoading}
+            disabled={isPending}
           >
             Voltar
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!isFormValid || isLoading || overdueReasons.length === 0}
+            disabled={!isFormValid || isPending || overdueReasons.length === 0}
             className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              isFormValid && !isLoading && overdueReasons.length > 0
+              isFormValid && !isPending && overdueReasons.length > 0
                 ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95'
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
           >
-            {isLoading ? (
+            {isPending ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 <span>Processando...</span>

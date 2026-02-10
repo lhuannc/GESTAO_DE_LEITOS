@@ -12,14 +12,14 @@ interface CancelOrderModalProps {
   }) => Promise<void>;
   onClose: () => void;
   reasons: Reason[];
-  isLoading?: boolean;
+  isPending?: boolean;
 }
 
 const CancelOrderModal: React.FC<CancelOrderModalProps> = ({
   onConfirm,
   onClose,
   reasons,
-  isLoading = false
+  isPending = false
 }) => {
   const [formData, setFormData] = useState({
     reasonId: '',
@@ -65,7 +65,7 @@ const CancelOrderModal: React.FC<CancelOrderModalProps> = ({
           <button 
             onClick={onClose} 
             className="text-slate-400 hover:text-slate-600 transition-colors"
-            disabled={isLoading}
+            disabled={isPending}
           >
             <X size={20} />
           </button>
@@ -89,7 +89,7 @@ const CancelOrderModal: React.FC<CancelOrderModalProps> = ({
               value={formData.reasonId}
               onChange={(e) => setFormData({ ...formData, reasonId: e.target.value })}
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none text-sm font-bold text-slate-700"
-              disabled={isLoading}
+              disabled={isPending}
               required
             >
               <option value="">Selecione um motivo</option>
@@ -117,7 +117,7 @@ const CancelOrderModal: React.FC<CancelOrderModalProps> = ({
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none text-sm font-medium text-slate-700 resize-none"
               rows={3}
               placeholder="Detalhes adicionais sobre o cancelamento..."
-              disabled={isLoading}
+              disabled={isPending}
             />
           </div>
 
@@ -141,7 +141,7 @@ const CancelOrderModal: React.FC<CancelOrderModalProps> = ({
                   }}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none text-sm font-bold text-slate-700"
                   placeholder="000.000.000-00"
-                  disabled={isLoading}
+                  disabled={isPending}
                   maxLength={14}
                   required
                 />
@@ -157,7 +157,7 @@ const CancelOrderModal: React.FC<CancelOrderModalProps> = ({
                   onChange={(e) => setFormData({ ...formData, userPassword: e.target.value })}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-rose-500 outline-none text-sm font-bold text-slate-700"
                   placeholder="Digite sua senha"
-                  disabled={isLoading}
+                  disabled={isPending}
                   required
                 />
               </div>
@@ -170,20 +170,20 @@ const CancelOrderModal: React.FC<CancelOrderModalProps> = ({
           <button
             onClick={onClose}
             className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold text-sm hover:bg-slate-200 transition-colors"
-            disabled={isLoading}
+            disabled={isPending}
           >
             Voltar
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!isFormValid || isLoading || cancellationReasons.length === 0}
+            disabled={!isFormValid || isPending || cancellationReasons.length === 0}
             className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              isFormValid && !isLoading && cancellationReasons.length > 0
+              isFormValid && !isPending && cancellationReasons.length > 0
                 ? 'bg-rose-600 text-white hover:bg-rose-700 active:scale-95'
                 : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
           >
-            {isLoading ? (
+            {isPending ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 <span>Cancelando...</span>
